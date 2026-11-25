@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CaloCoupe — traçage pour calorifugeurs</title>
+  <meta name="description" content="Cotes de coupe des coquilles de laine et développés PVC pour tuyauteries acier : parties droites, coudes en secteurs, piquages.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%23f2a31b'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%23475569'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="#droit">
+      <span class="logo" aria-hidden="true"></span>
+      <span>Calo<b>Coupe</b></span>
+    </a>
+    <nav class="tabs" role="tablist" aria-label="Outils">
+      <span class="pill" aria-hidden="true"></span>
+      <button role="tab" data-tab="droit">Développés</button>
+      <button role="tab" data-tab="coude">Coude</button>
+      <button role="tab" data-tab="piquage">Pénétrant</button>
+      <button role="tab" data-tab="memo">Mémo</button>
+    </nav>
+    <button class="theme" type="button" id="theme" aria-label="Changer de thème">◐</button>
+  </header>
+
+  <main>
+    <!-- Données communes -->
+    <section class="card base" id="base" aria-label="Tuyau et isolant">
+      <div class="fields">
+        <label class="field">
+          <span id="lblTube">Tube acier</span>
+          <select id="tube"></select>
+        </label>
+        <label class="field" id="fieldLibre" hidden>
+          <span>Ø extérieur tube</span>
+          <span class="unit"><input id="dLibre" type="number" min="5" max="2000" step="0.1" inputmode="decimal"></span>
+        </label>
+        <div class="field wide">
+          <span id="lblE">Épaisseur isolant</span>
+          <div class="chips" id="chipsE" role="group" aria-labelledby="lblE"></div>
+        </div>
+        <div class="field wide">
+          <span id="lblC">Intérieur coquille (Ø en mm)</span>
+          <div class="chips" id="chipsC" role="group" aria-labelledby="lblC"></div>
+        </div>
+        <details class="plus">
+          <summary>Ajustements<span class="recap" id="recapBase"></span></summary>
+          <div class="fields">
+            <label class="field"><span>Autre épaisseur</span><span class="unit"><input id="e" type="number" min="5" max="300" step="1" inputmode="numeric"></span></label>
+            <label class="field"><span>Recouvrement PVC</span><span class="unit"><input id="recouv" type="number" min="0" max="150" step="5" inputmode="numeric"></span></label>
+            <label class="field"><span>Autre Ø intérieur coquille</span><span class="unit"><input id="coq" type="number" min="5" max="2000" step="0.1" inputmode="decimal"></span></label>
+          </div>
+        </details>
+      </div>
+      <div class="summary" id="summary" aria-live="polite"></div>
+    </section>
+
+    <!-- Développés -->
+    <section class="panel" id="p-droit" role="tabpanel">
+      <div class="head">
+        <h1>Développés &amp; métré</h1>
+        <p>La feuille PVC à découper pour une partie droite, et les quantités pour votre longueur.</p>
+      </div>
+      <div class="controls card">
+        <label class="field"><span>Longueur à isoler</span><span class="unit u-m"><input id="longueur" type="number" min="0" step="0.5" inputmode="decimal"></span></label>
+        <details class="plus">
+          <summary>Ajustements<span class="recap" id="recapDroit"></span></summary>
+          <div class="fields">
+            <label class="field"><span>Longueur d'une coquille</span><span class="unit"><input id="lcoq" type="number" min="100" step="100" inputmode="numeric"></span></label>
+            <label class="field"><span>Largeur d'une virole PVC</span><span class="unit"><input id="largeur" type="number" min="50" step="10" inputmode="numeric"></span></label>
+          </div>
+        </details>
+      </div>
+      <div id="out-droit"></div>
+    </section>
+
+    <!-- Coude -->
+    <section class="panel" id="p-coude" role="tabpanel">
+      <div class="head">
+        <h1>Coude en secteurs</h1>
+        <p>Sections entières + deux demies, pour la coquille et pour le PVC.</p>
+      </div>
+      <div class="controls card">
+        <div class="field wide">
+          <span id="lblAngle">Angle du coude</span>
+          <div class="seg" id="segAngle" role="group" aria-labelledby="lblAngle"></div>
+        </div>
+        <div class="field wide">
+          <span id="lblSec">Sections entières (+ 2 demies)</span>
+          <div class="seg" id="segSec" role="group" aria-labelledby="lblSec"></div>
+        </div>
+        <details class="plus">
+          <summary>Ajustements<span class="recap" id="recapCoude"></span></summary>
+          <div class="fields">
+            <label class="field"><span>Autre angle</span><span class="unit u-deg"><input id="angle" type="number" min="5" max="180" step="1" inputmode="numeric"></span></label>
+            <label class="field">
+              <span>Rayon à l'axe du coude</span>
+              <span class="unit"><input id="rayon" type="number" min="1" step="1" inputmode="decimal"></span>
+              <button type="button" class="link" id="rayonAuto">Rayon 3D du tube</button>
+            </label>
+          </div>
+        </details>
+      </div>
+      <div id="out-coude"></div>
+    </section>
+
+    <!-- Piquage -->
+    <section class="panel" id="p-piquage" role="tabpanel">
+      <div class="head">
+        <h1>Pénétrant / piquage</h1>
+        <p>Le tube principal est celui réglé en haut. Indiquez ici le piquage qui vient dessus.</p>
+      </div>
+      <div class="controls card">
+        <label class="field"><span>Tube du piquage</span><select id="tube2"></select></label>
+        <label class="field" id="fieldLibre2" hidden><span>Ø extérieur piquage</span><span class="unit"><input id="dLibre2" type="number" min="5" step="0.1" inputmode="decimal"></span></label>
+        <div class="field wide">
+          <span id="lblE2">Épaisseur isolant du piquage</span>
+          <div class="chips" id="chipsE2" role="group" aria-labelledby="lblE2"></div>
+        </div>
+        <div class="field wide">
+          <span id="lblC2">Intérieur coquille du piquage (Ø en mm)</span>
+          <div class="chips" id="chipsC2" role="group" aria-labelledby="lblC2"></div>
+        </div>
+        <div class="field wide">
+          <span id="lblGamma">Angle entre les axes</span>
+          <div class="seg" id="segGamma" role="group" aria-labelledby="lblGamma"></div>
+        </div>
+        <details class="plus">
+          <summary>Ajustements<span class="recap"></span></summary>
+          <div class="fields">
+            <label class="field"><span>Autre épaisseur</span><span class="unit"><input id="e2" type="number" min="5" max="300" step="1" inputmode="numeric"></span></label>
+            <label class="field"><span>Autre Ø intérieur coquille</span><span class="unit"><input id="coq2" type="number" min="5" step="0.1" inputmode="decimal"></span></label>
+            <label class="field"><span>Autre angle</span><span class="unit u-deg"><input id="gamma" type="number" min="25" max="90" step="1" inputmode="numeric"></span></label>
+          </div>
+        </details>
+      </div>
+      <div id="out-piquage"></div>
+    </section>
+
+    <!-- Mémo -->
+    <section class="panel" id="p-memo" role="tabpanel">
+      <div class="head">
+        <h1>Mémo de pose</h1>
+        <p>Les repères utiles à garder sous la main.</p>
+      </div>
+      <div class="grid">
+        <article class="card">
+          <h2>Coquilles de laine</h2>
+          <ul>
+            <li>Coquilles posées jointives : aucun pont thermique.</li>
+            <li>Fixation mécanique (fil ou adhésif) tous les 50 cm au maximum ; chaque secteur de coude a sa ligature.</li>
+            <li>Joint longitudinal jamais sur la génératrice supérieure ; en multicouche, décaler les joints.</li>
+            <li>En vertical, prévoir des supports pour empêcher le glissement (tous les 5 m).</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h2>Revêtement PVC</h2>
+          <ul>
+            <li>Réservé aux installations <b>intérieures</b>, avec une température de surface compatible avec le PVC.</li>
+            <li>Recouvrements longitudinaux et circonférentiels : <b>20 mm minimum</b> sur réseaux chauds, <b>30 mm minimum</b> sur réseaux froids ; 30 mm est proposé par défaut ici.</li>
+            <li>Tuyau horizontal, bonne pratique reprise des revêtements métalliques : placer le joint hors des 30° de part et d'autre du dessus.</li>
+            <li>Monter les secteurs dans le sens de la goutte d'eau.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h2>Arrêts et accessoires</h2>
+          <ul>
+            <li>Arrêter isolant et revêtement à une distance qui permet de démonter la boulonnerie.</li>
+            <li>Poser une collerette à chaque arrêt.</li>
+            <li>Sur vannes et brides, même épaisseur que le réseau au minimum.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h2>Sécurité</h2>
+          <ul>
+            <li>Gants, lunettes, masque anti-poussières et manches longues pour la découpe de laine.</li>
+            <li>Isolation ancienne : vérifier le repérage amiante avant d'ouvrir quoi que ce soit.</li>
+            <li>Travail en hauteur : moyens d'accès adaptés et vérifiés.</li>
+          </ul>
+        </article>
+      </div>
+      <p class="note">Rappels tirés du NF DTU 45.2 (version 2006 consultée en ligne) et du guide de pose Isover « U Pipe Section ». Le CCTP du chantier et la version en vigueur de la norme priment.</p>
+      <p class="note">Hypothèses de calcul : surfaces cylindriques parfaites, épaisseur du PVC et du trait de coupe négligées. Tubes : Ø extérieur normalisé ; rayon de coude 3D selon EN 10253. Faites toujours un essai sur une chute avant de débiter en série.</p>
+    </section>
+  </main>
+
+  <div id="print" aria-hidden="true"></div>
+
+  <script src="calc.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
