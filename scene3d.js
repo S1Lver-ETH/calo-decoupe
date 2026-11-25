@@ -504,6 +504,8 @@
   var FABRIQUES = { droit: modeleDroit, coude: modeleCoude, piquage: modelePiquage };
 
   /* reglages : pvc (affiché au départ), libre (zoom et déplacement), bouton (retour à la vue de départ) */
+  var ICONE_PLEIN = '<svg viewBox="0 0 20 20"><path d="M3.5 7.5v-4h4M16.5 7.5v-4h-4M3.5 12.5v4h4M16.5 12.5v4h-4"/></svg>';
+  var ICONE_FERMER = '<svg viewBox="0 0 20 20"><path d="M5 5l10 10M15 5L5 15"/></svg>';
   function creer(type, titre, avecEclate, reglages) {
     reglages = reglages || {};
     var el = document.createElement('figure');
@@ -515,7 +517,7 @@
       (reglages.bouton ? '<button type="button" class="option" data-vue="depart">' + reglages.bouton + '</button>' : '') + '</div></div>' +
       (reglages.selection ? '<div class="scene-morceaux" role="group" aria-label="Morceau à coter"></div>' : '') +
       '<div class="scene-vue" tabindex="0" aria-label="Modèle 3D, flèches pour faire tourner"><canvas></canvas><svg aria-hidden="true"></svg>' +
-      (reglages.libre ? '<div class="zoom"><button type="button" data-zoom="1.25" aria-label="Zoomer">+</button><button type="button" data-zoom="0.8" aria-label="Dézoomer">−</button></div>' : '') + '</div>' +
+      (reglages.libre ? '<div class="zoom"><button type="button" data-plein aria-label="Plein écran">' + ICONE_PLEIN + '</button><button type="button" data-zoom="1.3" aria-label="Zoomer">+</button><button type="button" data-zoom="0.77" aria-label="Dézoomer">−</button></div>' : '') + '</div>' +
       (reglages.selection ? '<div class="fiche" aria-live="polite"></div>' : '') +
       '<figcaption></figcaption>';
     var zone = el.querySelector('.scene-vue'), toile = el.querySelector('canvas'), calque = el.querySelector('.scene-vue > svg'), legende = el.querySelector('figcaption');
@@ -620,7 +622,7 @@
       }
       el.querySelectorAll('[data-pvc]').forEach(function (b) { b.setAttribute('aria-pressed', String((b.dataset.pvc === '1') === opt.pvc)); });
       el.querySelectorAll('[data-opt]').forEach(function (b) { b.setAttribute('aria-pressed', String(opt[b.dataset.opt])); });
-      var aide = reglages.libre ? 'Touchez un morceau pour le sélectionner. Glissez pour tourner ; + et − ou deux doigts pour zoomer ; deux doigts ou Maj + glisser pour déplacer ; « ' + reglages.bouton + ' » pour revenir. '
+      var aide = reglages.libre ? (reglages.selection ? 'Touchez un morceau pour le sélectionner. ' : '') + 'Un doigt pour tourner, deux doigts pour zoomer et déplacer ; boutons + et −, ou ⤢ pour le plein écran ; « ' + reglages.bouton + ' » pour revenir. '
         : 'Glissez pour faire tourner, touchez deux fois pour recentrer. ';
       legende.textContent = (gl ? aide + 'Les cotes des faces cachées sont masquées. ' : 'La 3D n’est pas disponible sur cet appareil. ') +
         (opt.pvc ? donnees.legendePVC : donnees.legendeLaine);
@@ -723,8 +725,24 @@
     ['pointerup', 'pointercancel'].forEach(function (n) { zone.addEventListener(n, function (ev) { delete doigts[ev.pointerId]; prise = null; pince = null; appui = null; }); });
     if (!reglages.selection) zone.addEventListener('dblclick', function (ev) { if (!ev.target.closest('.zoom')) revenir(); });
     if (reglages.libre) {
-      zone.querySelector('.zoom').addEventListener('click', function (ev) { var b = ev.target.closest('button'); if (b) zoomer(+b.dataset.zoom); });
-      zone.addEventListener('wheel', function (ev) { if (ev.ctrlKey) { ev.preventDefault(); zoomer(Math.exp(-ev.deltaY * 0.004)); } }, { passive: false });
+      var boutonPlein = zone.querySelector('[data-plein]');
+      var basculerPlein = function (on) {
+        zone.classList.toggle('plein', on);
+        document.body.classList.toggle('vue-pleine', on);
+        boutonPlein.innerHTML = on ? ICONE_FERMER : ICONE_PLEIN;
+        boutonPlein.setAttribute('aria-label', on ? 'Quitter le plein écran' : 'Plein écran');
+        if (on) zone.focus({ preventScroll: true });
+        demander();
+      };
+      zone.querySelector('.zoom').addEventListener('click', function (ev) {
+        var b = ev.target.closest('button'); if (!b) return;
+        if (b.hasAttribute('data-plein')) basculerPlein(!zone.classList.contains('plein'));
+        else zoomer(+b.dataset.zoom);
+      });
+      document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && zone.classList.contains('plein')) basculerPlein(false); });
+      zone.addEventListener('wheel', function (ev) {
+        if (ev.ctrlKey || zone.classList.contains('plein')) { ev.preventDefault(); zoomer(Math.exp(-ev.deltaY * 0.004)); }
+      }, { passive: false });
       zone.addEventListener('contextmenu', function (ev) { ev.preventDefault(); });
     }
     zone.addEventListener('keydown', function (ev) {

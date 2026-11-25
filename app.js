@@ -285,7 +285,7 @@
       d: d, D: r.D, coq: S.coq, recouv: S.recouv,
       textes: { diametre: 'Ø ' + lg(r.D, 1), laine: 'Laine ' + lg(S.e, 1), virole: 'Virole ' + lg(S.largeur), feuille: 'Feuille PVC ' + lg(r.feuille), recouv: 'Recouvr. ' + lg(S.recouv) },
       legendePVC: 'Cotes en ' + un() + ' ; longueurs raccourcies.', legendeLaine: 'Cotes en ' + un() + ' ; longueurs raccourcies.'
-    });
+    }, { libre: true, bouton: 'Recentrer' });
   }
 
   /* ---------- coude ---------- */
@@ -411,7 +411,7 @@
     }
 
     gabarits = {};
-    html += '<div class="head"><h1>Revêtement PVC du coude</h1><p>Pièces à plat : dos au milieu, joint au ventre, ' + lg(S.recouv) + ' ' + un() + ' de recouvrement inclus.</p></div><div class="grid">';
+    html += '<div class="grid">';
     (c.n > 0 ? [true, false] : [false]).forEach(function (ent) {
       var id = ent ? 'pvc-e' : 'pvc-d', idc = ent ? 'coq-e' : 'coq-d';
       var f = formePVC(c, ent);
@@ -424,7 +424,7 @@
         '<figcaption>Cotes en ' + un() + ', recouvrement compris. Bord du dessin : coupe. Zones hachurées : recouvrement' + (ent ? ' (bord courbe et joint longitudinal).' : ' ; le bord droit rejoint la virole de la partie droite, qui vient le recouvrir.') + '</figcaption>' +
         boutons(id) + '</figure>';
     });
-    html += '</div><div class="card" style="margin-top:16px"><h2>Gabarits de coupe à enrouler sur la coquille</h2><p class="note">Imprimez à 100 % (taille réelle), vérifiez la règle de ' + lg(100) + ' ' + un() + ', assemblez les feuilles puis enroulez autour de la coquille.</p><div class="actions">' +
+    html += '</div><div class="card"><h2>Gabarits de coupe à enrouler sur la coquille</h2><p class="note">Imprimez à 100 % (taille réelle), vérifiez la règle de ' + lg(100) + ' ' + un() + ', assemblez les feuilles puis enroulez autour de la coquille.</p><div class="actions">' +
       (c.n > 0 ? '<button type="button" class="btn" data-print="coq-e">Imprimer : section entière</button>' : '') +
       '<button type="button" class="btn" data-print="coq-d">Imprimer : demi-section</button></div></div>';
     out.innerHTML = html;
@@ -714,7 +714,7 @@
       '<div id="gabarit-principal">' + contenuPrincipal() + '</div>' + boutons('princ') + '</figure></div>';
     var d2 = S.tube2 === 'libre' ? S.dLibre2 : tubeDe(S.tube2).d;
     out.innerHTML = alerteCoquille(S.coq2, d2, 'piquage') + html;
-    poserScene('piquage', 'Modèle 3D : le pénétrant', true, donneesScenePiquage());
+    poserScene('piquage', 'Modèle 3D : le pénétrant', true, donneesScenePiquage(), { libre: true, bouton: 'Recentrer' });
   }
 
   /* ---------- gabarits 1:1 ---------- */
@@ -825,7 +825,11 @@
     var onglet = RENDUS[S.tab] ? S.tab : 'droit';
     $('base').hidden = onglet === 'memo';
     var valide = S.coq > 0 && S.e > 0 && S.recouv >= 0;
-    if (valide) { resume(); RENDUS[onglet](); adapterBoutons(); animer($('p-' + onglet)); }
+    if (valide) {
+      resume(); RENDUS[onglet](); adapterBoutons();
+      if (window.Widgets && $('out-' + onglet)) window.Widgets.organiser($('out-' + onglet), onglet);
+      animer($('p-' + onglet));
+    }
     else { $('summary').innerHTML = '<div><span>Saisie incomplète</span><b>Indiquez le diamètre et l’épaisseur.</b></div>'; var o = $('out-' + onglet); if (o) o.innerHTML = ''; }
   }
 
