@@ -1,4 +1,4 @@
-/* CaloCoupe — formules de traçage (toutes les cotes en millimètres, angles en degrés).
+/* Calo Découpe — formules de traçage (toutes les cotes en millimètres, angles en degrés).
    Fonctions pures : aucune dépendance à la page, utilisables aussi avec Node pour les tests. */
 (function (root) {
   'use strict';
@@ -147,10 +147,92 @@
     };
   }
 
+  /* Angle (entre 0 et 180°) de la génératrice qui descend le plus : 90° pour un piquage droit,
+     entre 90 et 180° pour un piquage incliné. */
+  function angleCreux(p) {
+    var fond = 0;
+    for (var a = 1; a <= 180; a++) if (p.ordonnee(a) > p.ordonnee(fond) + 1e-6) fond = a;
+    return fond;
+  }
+
+  /* Gabarit du piquage ouvert à l'angle "depart" (degrés) : repères tous les 90° et aux fonds, bords compris.
+     x = distance sur le développé depuis le bord gauche ; y = descente sous le trait d'équerre. */
+  function reperesPiquage(p, depart) {
+    var fond = angleCreux(p), dedans = [];
+    [0, 90, 180, 270, fond, 360 - fond].forEach(function (base) {
+      [base, base + 360, base + 720].forEach(function (a) {
+        if (a > depart && a < depart + 360 && dedans.every(function (b) { return Math.abs(a - b) > 0.5; })) dedans.push(a);
+      });
+    });
+    var angles = [depart].concat(dedans.sort(function (a, b) { return a - b; }), depart + 360);
+    return angles.map(function (angle, i) {
+      var y = p.ordonnee(angle), x = p.dev2 * (angle - depart) / 360;
+      var avant = i ? angles[i - 1] : null;
+      var dx = i ? p.dev2 * (angle - avant) / 360 : 0, dy = i ? y - p.ordonnee(avant) : 0;
+      return {
+        angle: ((angle % 360) + 360) % 360, x: x, y: y, bord: i === 0 || i === angles.length - 1,
+        zero: y < 0.5, creux: y > p.profondeur - 0.5, pas: dx, compas: Math.hypot(dx, dy)
+      };
+    });
+  }
+
+  /* Du point à 0 jusqu'au fond de la gueule de loup le plus proche. */
+  function zeroAuCreux(p) {
+    /* le zéro est à 0° */
+    var fond = angleCreux(p);
+    var axe = p.dev2 * fond / 360, h = p.ordonnee(fond);
+    return { angle: fond, axe: axe, profondeur: h, compas: Math.hypot(axe, h) };
+  }
+
+  /* garde la partie d'un polygone comprise entre x = min et x = max */
+  function decouperBande(poly, min, max) {
+    [[min, 1], [max, -1]].forEach(function (bord) {
+      var x = bord[0], sens = bord[1], out = [];
+      poly.forEach(function (a, i) {
+        var b = poly[(i + 1) % poly.length];
+        var da = (a[0] - x) * sens >= 0, db = (b[0] - x) * sens >= 0;
+        if (da) out.push(a);
+        if (da !== db) out.push([x, a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0])]);
+      });
+      poly = out;
+    });
+    return poly;
+  }
+
+  /* Gabarit PVC du principal : la virole développée avec le trou du piquage.
+     depart = angle autour du principal où la feuille s'ouvre (0° = côté piquage, au centre du trou).
+     u = le long du développé depuis le bord gauche ; v = le long du tube depuis le bord haut.
+     longueur = 0 : longueur proposée (trou + 60 mm de chaque côté). */
+  function gabaritPrincipal(p, depart, longueur, recouv) {
+    var dev = p.dev1, milieu = (p.trouXMin + p.trouXMax) / 2;
+    var L = longueur > 0 ? Math.max(longueur, p.trouLongueur + 20) : Math.ceil((p.trouLongueur + 120) / 10) * 10;
+    var modulo = function (a) { var m = ((a % dev) + dev) % dev; return dev - m < 1e-7 ? 0 : m; };
+    var uc = modulo(-depart / 360 * dev);
+    var v = function (x) { return L / 2 - (x - milieu); };
+    var trous = [];
+    [-1, 0, 1].forEach(function (j) {
+      var poly = decouperBande(p.trou.slice(0, -1).map(function (q) { return [uc + j * dev + q.s, v(q.x)]; }), 0, dev + recouv);
+      if (poly.length < 3) return;
+      var xs = poly.map(function (q) { return q[0]; });
+      if (Math.max.apply(null, xs) - Math.min.apply(null, xs) > 0.01) trous.push(poly);
+    });
+    var points = [0, 45, 90, 135, 180, 225, 270, 315, 360].map(function (angle) {
+      var q = pointTrou(p.r1, p.r2, p.gamma, angle);
+      return { angle: angle % 360, s: q.s, x: q.x, u: modulo(uc + q.s), v: v(q.x), compas: 0 };
+    });
+    for (var i = 1; i < points.length; i++) points[i].compas = Math.hypot(points[i].s - points[i - 1].s, points[i].x - points[i - 1].x);
+    var entre = function (a, b) { return Math.hypot(points[b].s - points[a].s, points[b].x - points[a].x); };
+    return {
+      dev: dev, L: L, uc: uc, origine: v(0), haut: v(p.trouXMax), bas: v(p.trouXMin), demiLargeur: p.trouLargeur / 2,
+      trous: trous, points: points, compasHaut: entre(0, 2), compasBas: entre(2, 4)
+    };
+  }
+
   var api = {
     TUBES: TUBES, diametreFini: diametreFini, developpe: developpe, droit: droit,
     coude: coude, rayonPourVentre: rayonPourVentre, hauteurSecteur: hauteurSecteur, debit: debit,
-    distancePiquage: distancePiquage, pointTrou: pointTrou, piquage: piquage
+    distancePiquage: distancePiquage, pointTrou: pointTrou, piquage: piquage,
+    reperesPiquage: reperesPiquage, zeroAuCreux: zeroAuCreux, gabaritPrincipal: gabaritPrincipal
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Calc = api;

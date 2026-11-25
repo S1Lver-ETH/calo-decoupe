@@ -3,16 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>CaloCoupe — traçage pour calorifugeurs</title>
+  <title>Calo Découpe — traçage pour calorifugeurs</title>
   <meta name="description" content="Cotes de coupe des coquilles de laine et développés PVC pour tuyauteries acier : parties droites, coudes en secteurs, piquages.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%23f2a31b'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%23475569'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22if%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ffc658%22%2F%3E%3Cstop%20offset%3D%22.52%22%20stop-color%3D%22%23f9861a%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23d6440c%22%2F%3E%3C%2FlinearGradient%3E%3ClinearGradient%20id%3D%22ip%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ffffff%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffe6c7%22%2F%3E%3C%2FlinearGradient%3E%3ClinearGradient%20id%3D%22ic%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%2334425e%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23111a2c%22%2F%3E%3C%2FlinearGradient%3E%3ClinearGradient%20id%3D%22ir%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%22.5%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%220%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2218%22%20fill%3D%22url(%23if)%22%2F%3E%3Cpath%20fill%3D%22url(%23ir)%22%20d%3D%22M0%2018C0%208%208%200%2018%200h28c10%200%2018%208%2018%2018v5C45%2034%2021%2021%200%2033Z%22%2F%3E%3Cg%20fill%3D%22url(%23ip)%22%20stroke%3D%22url(%23ip)%22%20stroke-width%3D%221.4%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M30%2053.2H50V32.8L30%2041.1Z%22%2F%3E%3Cpath%20d%3D%22M10.8%2014H31.2L22.9%2034H10.8Z%22%2F%3E%3C%2Fg%3E%3Cpath%20class%3D%22coupe%22%20fill%3D%22url(%23ic)%22%20stroke%3D%22url(%23ic)%22%20stroke-width%3D%221.4%22%20stroke-linejoin%3D%22round%22%20d%3D%22M32.8%2037.2L52.6%2029L35%2011.4L26.8%2031.2Z%22%2F%3E%3C%2Fsvg%3E">
   <link rel="stylesheet" href="style.css">
+  <style>
+    /* remplissages des dessins : déclarés ici pour que url(#…) désigne les motifs de la page */
+    .draw .s-wool { fill: url(#laine); } .draw .s-wool2 { fill: url(#laine2); }
+    .draw .s-sheet { fill: url(#pvc); } .draw .s-zone { fill: url(#hachure); } .draw .s-steel { fill: url(#acier); }
+  </style>
 </head>
 <body>
   <header class="top">
     <a class="brand" href="#droit">
-      <span class="logo" aria-hidden="true"></span>
-      <span>Calo<b>Coupe</b></span>
+      <svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="logo-f" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffc658"/><stop offset=".52" stop-color="#f9861a"/><stop offset="1" stop-color="#d6440c"/></linearGradient><linearGradient id="logo-p" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#ffe6c7"/></linearGradient><linearGradient id="logo-c" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34425e"/><stop offset="1" stop-color="#111a2c"/></linearGradient><linearGradient id="logo-r" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".5"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs><rect width="64" height="64" rx="18" fill="url(#logo-f)"/><path fill="url(#logo-r)" d="M0 18C0 8 8 0 18 0h28c10 0 18 8 18 18v5C45 34 21 21 0 33Z"/><g fill="url(#logo-p)" stroke="url(#logo-p)" stroke-width="1.4" stroke-linejoin="round"><path d="M30 53.2H50V32.8L30 41.1Z"/><path d="M10.8 14H31.2L22.9 34H10.8Z"/></g><path class="coupe" fill="url(#logo-c)" stroke="url(#logo-c)" stroke-width="1.4" stroke-linejoin="round" d="M32.8 37.2L52.6 29L35 11.4L26.8 31.2Z"/></svg>
+      <span class="nom">Calo <b>Découpe</b></span>
     </a>
     <nav class="tabs" role="tablist" aria-label="Outils">
       <span class="pill" aria-hidden="true"></span>
@@ -21,7 +26,10 @@
       <button role="tab" data-tab="piquage">Pénétrant</button>
       <button role="tab" data-tab="memo">Mémo</button>
     </nav>
-    <button class="theme" type="button" id="theme" aria-label="Changer de thème">◐</button>
+    <div class="outils">
+      <button class="rond" type="button" id="unite">mm</button>
+      <button class="theme" type="button" id="theme" aria-label="Changer de thème">◐</button>
+    </div>
   </header>
 
   <main>
@@ -37,7 +45,7 @@
           <span class="unit"><input id="dLibre" type="number" min="5" max="2000" step="0.1" inputmode="decimal"></span>
         </label>
         <div class="field wide">
-          <span id="lblE">Épaisseur isolant</span>
+          <span id="lblE">Épaisseur isolant (mm)</span>
           <div class="chips" id="chipsE" role="group" aria-labelledby="lblE"></div>
         </div>
         <div class="field wide">
@@ -115,7 +123,7 @@
         <label class="field"><span>Tube du piquage</span><select id="tube2"></select></label>
         <label class="field" id="fieldLibre2" hidden><span>Ø extérieur piquage</span><span class="unit"><input id="dLibre2" type="number" min="5" step="0.1" inputmode="decimal"></span></label>
         <div class="field wide">
-          <span id="lblE2">Épaisseur isolant du piquage</span>
+          <span id="lblE2">Épaisseur isolant du piquage (mm)</span>
           <div class="chips" id="chipsE2" role="group" aria-labelledby="lblE2"></div>
         </div>
         <div class="field wide">
@@ -188,6 +196,8 @@
   <div id="print" aria-hidden="true"></div>
 
   <script src="calc.js"></script>
+  <script src="scene3d.js"></script>
   <script src="app.js"></script>
+  <script src="effets.js"></script>
 </body>
 </html>
