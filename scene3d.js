@@ -4,7 +4,7 @@
   'use strict';
   var C = root.Calc;
   var RAD = Math.PI / 180, TOUR = Math.PI * 2;
-  var M = { laine: 0, tranche: 1, pvc: 2, joint: 3, acier: 4, creux: 5, collerette: 6, laine2: 7 };
+  var M = { laine: 0, tranche: 1, pvc: 2, joint: 3, acier: 4, creux: 5, collerette: 6, laine2: 7, tole: 8, tole2: 9 };
 
   /* ---------- texture de laine de roche ----------
      Teinte beige doré relevée sur les photos de coquilles (autour de #b0a16a).
@@ -418,6 +418,8 @@
     '  if (mt == 1) col *= 1.10; if (mt == 7) col *= 0.91;' +
     ' } else if (mt == 2) { col = vec3(0.77,0.79,0.82); brillance = 0.13; durete = 16.0; ambiante = 0.47; directe = 0.52; }' +
     ' else if (mt == 6) { col = vec3(0.70,0.73,0.77); brillance = 0.11; durete = 16.0; ambiante = 0.47; directe = 0.52; }' +
+    /* tôle : métal clair, reflets larges et léger brossé */
+    ' else if (mt == 8 || mt == 9) { col = mt == 8 ? vec3(0.70,0.73,0.76) : vec3(0.63,0.67,0.71); col *= 0.96 + 0.07*texture2D(laine, vP.xy/(tuile*3.0) + vP.zz/(tuile*5.0)).g; brillance = 0.58; durete = 12.0; ambiante = 0.42; directe = 0.50; }' +
     ' else if (mt == 3) { col = vec3(0.50,0.53,0.58); brillance = 0.15; }' +
     ' else if (mt == 4) { col = vec3(0.45,0.50,0.57); brillance = 0.55; durete = 22.0; }' +
     ' else { col = fibre*0.30; }' +
@@ -501,7 +503,308 @@
     vue.innerHTML = sortie + pastilles;
   }
 
-  var FABRIQUES = { droit: modeleDroit, coude: modeleCoude, piquage: modelePiquage };
+  /* ---------- ensemble : les pièces d'un relevé, à la suite ----------
+     opt.pvc = habillage affiché (PVC ou tôle selon le relevé) ; sinon la laine seule. */
+  function plus3(a, b, k) { return [a[0] + k * b[0], a[1] + k * b[1], a[2] + k * b[2]]; }
+  function croix(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+  function unite(a) { var n = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / n, a[1] / n, a[2] / n]; }
+  function repere(d) {
+    var u = plus3(Y, d, -d[1]);
+    if (Math.hypot(u[0], u[1], u[2]) < 0.2) u = plus3([0, 0, -1], d, d[2]);
+    u = unite(u);
+    return [u, croix(d, u)];
+  }
+
+  function modeleEnsemble(p, opt) {
+    var m = new Maillage(), geo = p.geo, segs = geo.segments, hab = opt.pvc;
+    var mat = p.tole ? M.tole : M.pvc, mat2 = p.tole ? M.tole2 : M.pvc, bande = p.tole ? M.tole2 : M.collerette;
+    var cotes = [], dernier = segs.length - 1;
+    var eclat = 0;
+    function rayons(sec) {
+      var ro = sec.D / 2, ri = Math.min(sec.coq / 2, ro * 0.98);
+      return { ro: ro, ri: ri, rs: Math.min(sec.d / 2, ri * 0.97), rp: ro * 1.016 };
+    }
+    /* trait de fermeture : bande de recouvrement et son bord, à l'angle theta (radians) */
+    function fermetures(T, r, ferm, vrai) {
+      if (!ferm || !hab) return;
+      for (var k = 0; k < ferm.faces; k++) {
+        var th = ferm.theta * RAD + k * Math.PI, large = Math.min(0.5, vrai / r);
+        peau(m, T, r * 1.006, bande, { t0: th, t1: th + large });
+        peau(m, T, r * 1.012, M.joint, { t0: th + large - 0.02, t1: th + large + 0.02 });
+        peau(m, T, r * 1.012, M.joint, { t0: th - 0.012, t1: th + 0.012 });
+      }
+    }
+    /* partie droite habillée ou nue entre deux points */
+    function trongon(o, d, L, sec, ferm, viroles) {
+      var q = rayons(sec), f = repere(d), T = droite(o, d, f[0], f[1], 0, L);
+      if (hab) {
+        peau(m, T, q.rp, mat);
+        bout(m, T, q.ro, q.rp * 1.004, 'debut', M.joint); bout(m, T, q.ro, q.rp * 1.004, 'fin', M.joint);
+        lisere(m, T, q.rp * 1.004, 'fin', q.ro * 0.035);
+        (viroles || []).forEach(function (x) {
+          var B = droite(o, d, f[0], f[1], x - q.ro * 0.1, x);
+          peau(m, B, q.rp * 1.008, mat2); lisere(m, B, q.rp * 1.012, 'fin', q.ro * 0.03);
+        });
+        fermetures(T, q.rp, ferm, p.recouv);
+      } else {
+        coquille(m, T, q.ri, q.ro, { debut: false, fin: false });
+        peau(m, T, q.ro * 1.004, M.creux, { de: function () { return L - q.ro * 0.025; }, a: T.fin });
+      }
+      return T;
+    }
+    function acierDroit(o, d, a, b, sec) { var f = repere(d); acier(m, droite(o, d, f[0], f[1], a, b), rayons(sec).rs); }
+    function extremite(o, d, sec, cote) {   /* tranche de laine visible à un bout libre */
+      var q = rayons(sec), f = repere(d), T = droite(o, d, f[0], f[1], 0, 0);
+      bout(m, T, q.ri, q.ro, cote, M.tranche);
+    }
+
+    segs.forEach(function (g, i) {
+      var q = rayons(g.s), choisi = opt.choix === i;
+      m.piece = i; m.plus = choisi ? CHOISI : 0;
+      var dec = opt.eclate ? [g.d0[0] * eclat, g.d0[1] * eclat, g.d0[2] * eclat] : O;
+      if (opt.eclate) eclat += q.ro * 1.1;
+      var p0 = plus3(g.p0, dec, 1), milieu, normale;
+
+      if (g.type === 'droit') {
+        var vir = [], nb = Math.max(1, Math.ceil((g.L - 0.01) / Math.max(1, p.largeur - p.recouv)));
+        if (nb > 1 && nb <= 40) for (var k = 1; k < nb; k++) vir.push(g.Lv * k / nb);
+        trongon(p0, g.d0, g.Lv, g.s, g.ferm, vir);
+        if (!opt.eclate) acierDroit(p0, g.d0, 0, g.Lv, g.s);
+        var f = repere(g.d0);
+        milieu = plus3(plus3(p0, g.d0, g.Lv / 2), f[0], q.rp); normale = f[0];
+      } else if (g.type === 'coude') {
+        var A = g.q.angle * RAD, n = g.q.sections + 2, b = A / (2 * (g.q.sections + 1)), R = g.R;
+        var ex = [-g.n[0], -g.n[1], -g.n[2]], ey = g.d0, ez = croix(ex, ey), centre = plus3(g.centre, dec, 1);
+        var monde = function (v) { return [v[0] * ex[0] + v[1] * ey[0] + v[2] * ez[0], v[0] * ex[1] + v[1] * ey[1] + v[2] * ez[1], v[0] * ex[2] + v[1] * ey[2] + v[2] * ez[2]]; };
+        var er = function (t) { return [Math.cos(t), Math.sin(t), 0]; }, et = function (t) { return [-Math.sin(t), Math.cos(t), 0]; };
+        var secteur = function (j) {
+          var tau = 2 * j * b, a0 = j === 0 ? 0 : (2 * j - 1) * b, a1 = j === n - 1 ? A : (2 * j + 1) * b;
+          var ecart = opt.eclate ? lin(q.ro * 0.35, er(tau)) : O;
+          var lim = function (psi) { return function (r, t) { return Math.max(0, R + r * Math.cos(t)) * Math.tan(psi - tau); }; };
+          return {
+            pos: function (r, t, s) { return plus3(centre, monde(lin(R + r * Math.cos(t), er(tau), s, et(tau), r * Math.sin(t), Z, 1, ecart)), 1); },
+            nrm: function (t) { return monde(lin(Math.cos(t), er(tau), Math.sin(t), Z)); },
+            debut: lim(a0), fin: lim(a1), nDebut: monde(lin(-1, et(a0))), nFin: monde(et(a1))
+          };
+        };
+        if (!opt.eclate) {
+          m.grille(48, Math.max(8, Math.round(g.q.angle / 3)), function (u, w) {
+            var th = u * TOUR, t = w * A;
+            return [plus3(centre, monde(lin(R + q.rs * Math.cos(th), er(t), q.rs * Math.sin(th), Z)), 1), monde(lin(Math.cos(th), er(t), Math.sin(th), Z))];
+          }, M.acier);
+        }
+        for (var j = 0; j < n; j++) {
+          var S = secteur(j);
+          if (hab) {
+            var rr = q.rp * (1 + (j % 2) * 0.008);
+            peau(m, S, rr, j % 2 ? mat2 : mat);
+            lisere(m, S, rr * 1.004, 'fin', q.ro * 0.035);
+            if (j === 0) lisere(m, S, rr * 1.004, 'debut', q.ro * 0.035);
+            fermetures(S, rr, g.ferm, p.recouv);
+            if (opt.eclate) { bout(m, S, q.ro, rr, 'debut', M.joint); bout(m, S, q.ro, rr, 'fin', M.joint); coquille(m, S, q.ri, q.ro); }
+          } else {
+            coquille(m, S, q.ri, q.ro, { mat: j % 2 ? M.laine2 : M.laine, debut: opt.eclate, fin: opt.eclate });
+            if (!opt.eclate) peau(m, S, q.ro * 1.004, M.creux, { de: (function (T) { return function (x, t) { return T.fin(x, t) - q.ro * 0.025; }; })(S), a: S.fin });
+          }
+        }
+        var dos = monde(er(A / 2));
+        milieu = plus3(centre, dos, R + q.rp); normale = dos;
+        if (opt.detail && p.secteurs && p.secteurs[i]) {
+          var surf = hab ? q.rp * 1.01 : q.ro, recul = q.ro * 0.3, txt = p.secteurs[i];
+          for (var jj = 0; jj < n; jj++) {
+            var Sj = secteur(jj), tau = 2 * jj * b;
+            [[0, 1, txt.dos[jj]], [Math.PI, -1, txt.ventre[jj]]].forEach(function (k) {
+              var dehors = monde(lin(k[1], er(tau)));
+              var a0 = Sj.pos(surf, k[0], Sj.debut(surf, k[0])), a1 = Sj.pos(surf, k[0], Sj.fin(surf, k[0]));
+              cotes.push({ a: plus3(a0, dehors, recul), b: plus3(a1, dehors, recul), ea: a0, eb: a1, pousse: dehors, colonne: k[1] < 0, texte: k[2] });
+            });
+          }
+        }
+      } else if (g.type === 'te') {
+        trongon(p0, g.d0, g.Lv, g.s, g.ferm, []);
+        if (!opt.eclate) acierDroit(p0, g.d0, 0, g.Lv, g.s);
+        var posV = g.Lv * g.pos / g.L, croisement = plus3(p0, g.d0, posV);
+        var br = rayons(g.branche), gam = g.q.angle * RAD, d = g.d0, nb2 = g.n;
+        var axe = unite(plus3([d[0] * Math.cos(gam), d[1] * Math.cos(gam), d[2] * Math.cos(gam)], nb2, Math.sin(gam)));
+        var w = unite(plus3([d[0] * Math.sin(gam), d[1] * Math.sin(gam), d[2] * Math.sin(gam)], nb2, -Math.cos(gam))), z = croix(d, nb2);
+        var r2 = Math.min(br.ro, q.ro), depart = function (R1) { return function (r, t) { return C.distancePiquage(R1, Math.min(r, R1), g.q.angle, t / RAD); }; };
+        var sortie = opt.eclate ? q.ro * 0.8 : 0;
+        var longB = Math.max(g.q.longueurB * g.Lv / g.L, C.distancePiquage(q.ro, r2, g.q.angle, 0) + br.ro * 0.8);
+        var branche = function (R1) {
+          return {
+            pos: function (r, t, s) { return lin(1, croisement, s + sortie, axe, r * Math.cos(t), w, r * Math.sin(t), z); },
+            nrm: function (t) { return lin(Math.cos(t), w, Math.sin(t), z); },
+            debut: depart(R1), fin: function () { return longB; }, nDebut: lin(-1, axe), nFin: axe
+          };
+        };
+        if (!opt.eclate) acier(m, droite(croisement, axe, w, z, 0, longB + br.ro * 0.6), br.rs);
+        if (hab) {
+          var Bp = branche(q.rp), rp2 = r2 * 1.016;
+          peau(m, Bp, rp2, mat);
+          bout(m, Bp, r2, rp2, 'fin', M.joint);
+          peau(m, Bp, rp2 * 1.008, M.joint, { de: Bp.debut, a: function (r, t) { return Bp.debut(r, t) + br.ro * 0.05; } });
+          peau(m, Bp, rp2 * 1.01, M.joint, { t0: Math.PI - 0.015, t1: Math.PI + 0.015 });
+          bout(m, branche(q.ro), br.ri, r2, 'fin', M.tranche);
+        } else {
+          var Bl = branche(q.ro);
+          peau(m, Bl, r2, M.laine2); bout(m, Bl, br.ri, r2, 'fin', M.tranche);
+          peau(m, Bl, r2 * 1.004, M.creux, { de: Bl.debut, a: function (r, t) { return Bl.debut(r, t) + br.ro * 0.05; } });
+        }
+        milieu = lin(1, croisement, longB * 0.75 + sortie, axe, r2, w); normale = w;
+      } else if (g.type === 'reduction') {
+        var q2 = rayons(g.s2), dd = g.d0, f2 = repere(dd), L = g.Lv, dc = g.decalage;
+        var cone = function (ra, rb, matiere, dedans) {
+          m.grille(96, 2, function (u, v) {
+            var t = u * TOUR, r = ra + (rb - ra) * v, dir = lin(Math.cos(t), f2[0], Math.sin(t), f2[1]);
+            var c = lin(1, p0, v * L, dd, v, dc);
+            var nn = unite(lin(1, dir, (ra - rb) / L, dd));
+            return [plus3(c, dir, r), dedans ? lin(-1, nn) : nn];
+          }, matiere);
+        };
+        cone(hab ? q.rp : q.ro, hab ? q2.rp : q2.ro, hab ? mat2 : M.laine);
+        cone(q.ri, q2.ri, M.creux, true);
+        if (hab && g.ferm) for (var h = 0; h < g.ferm.faces; h++) {
+          (function (th) {
+            m.grille(1, 1, function (u, v) {
+              var t = th - 0.015 + 0.03 * u, r = (q.rp + (q2.rp - q.rp) * v) * 1.012, dir = lin(Math.cos(t), f2[0], Math.sin(t), f2[1]);
+              return [plus3(lin(1, p0, v * L, dd, v, dc), dir, r), dir];
+            }, M.joint);
+          })(g.ferm.theta * RAD + h * Math.PI);
+        }
+        if (!opt.eclate) cone(q.rs, q2.rs, M.acier);
+        milieu = lin(1, p0, L / 2, dd, 0.5, dc, (q.rp + q2.rp) / 2, f2[0]); normale = f2[0];
+      } else if (g.type === 'fond') {
+        var f3 = repere(g.d0), bombe = g.q.forme === 'bombe', haut = bombe ? q.ro * 0.45 : q.ro * 0.1;
+        var bord = droite(p0, g.d0, f3[0], f3[1], -q.ro * 0.12, 0);
+        peau(m, bord, q.rp * 1.03, hab ? mat2 : M.laine2); lisere(m, bord, q.rp * 1.036, 'debut', q.ro * 0.03);
+        m.grille(96, bombe ? 10 : 1, function (u, v) {
+          var t = u * TOUR, dir = lin(Math.cos(t), f3[0], Math.sin(t), f3[1]);
+          if (!bombe) return [lin(1, p0, haut * 0, g.d0, q.rp * 1.03 * v, dir), g.d0];
+          var a = v * Math.PI / 2, r = q.rp * 1.03 * Math.cos(a), x = haut * Math.sin(a);
+          return [lin(1, p0, x, g.d0, r, dir), unite(lin(Math.cos(a) / q.rp, dir, Math.sin(a) / haut, g.d0))];
+        }, hab ? mat : M.laine);
+        milieu = lin(1, p0, haut, g.d0, q.ro * 0.6, f3[0]); normale = g.d0;
+      } else {
+        var f4 = repere(g.d0), u4 = f4[0], v4 = f4[1], demiL = g.l / 2, demiH = g.h / 2;
+        var face = function (n4, a4, b4, dist, da, db, matiere) {
+          var c = plus3(plus3(p0, g.d0, g.Lv / 2), n4, dist);
+          m.grille(1, 1, function (s, t) { return [lin(1, c, (s - 0.5) * 2 * da, a4, (t - 0.5) * 2 * db, b4), n4]; }, matiere);
+        };
+        var mb = hab ? mat : M.laine, mb2 = hab ? mat2 : M.laine2, moins = function (a) { return [-a[0], -a[1], -a[2]]; };
+        face(u4, g.d0, v4, demiH, g.Lv / 2, demiL, mb); face(moins(u4), g.d0, v4, demiH, g.Lv / 2, demiL, mb);
+        face(v4, g.d0, u4, demiL, g.Lv / 2, demiH, mb2); face(moins(v4), g.d0, u4, demiL, g.Lv / 2, demiH, mb2);
+        face(g.d0, u4, v4, g.Lv / 2, demiH, demiL, mb); face(moins(g.d0), u4, v4, g.Lv / 2, demiH, demiL, mb);
+        /* arêtes et trait de fermeture */
+        [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(function (k) {
+          var o = lin(1, p0, k[0] * demiH, u4, k[1] * demiL, v4), e = droite(o, g.d0, u4, v4, 0, g.Lv);
+          peau(m, e, q.ro * 0.018, M.joint);
+        });
+        if (hab && g.ferm) for (var h2 = 0; h2 < g.ferm.faces; h2++) {
+          var th = g.ferm.theta * RAD + h2 * Math.PI, cs = Math.cos(th), sn = Math.sin(th);
+          var surU = Math.abs(cs) >= Math.abs(sn), nf = surU ? lin(cs > 0 ? 1 : -1, u4) : lin(sn > 0 ? 1 : -1, v4);
+          face(nf, g.d0, surU ? v4 : u4, (surU ? demiH : demiL) + q.ro * 0.012, g.Lv / 2, q.ro * 0.025, M.joint);
+        }
+        if (!opt.eclate) acierDroit(p0, g.d0, -q.ro * 0.3, g.Lv + q.ro * 0.3, g.s);
+        milieu = lin(1, p0, g.Lv / 2, g.d0, demiH, u4); normale = u4;
+      }
+
+      var texte = (i + 1) + ' · ' + p.etiquettes[i];
+      if (opt.detail && g.type === 'droit') {
+        var fd = repere(g.d0), haut = fd[0], da = plus3(p0, haut, q.ro * 1.45), db = plus3(plus3(p0, g.d0, g.Lv), haut, q.ro * 1.45);
+        cotes.push({ a: da, b: db, ea: plus3(p0, haut, q.rp), eb: plus3(plus3(p0, g.d0, g.Lv), haut, q.rp), pousse: haut, texte: p.etiquettes[i] });
+      }
+      if (!(opt.detail && (g.type === 'coude' || g.type === 'droit')) && (opt.choix === null || opt.choix === undefined || choisi)) {
+        cotes.push({ p: milieu, vers: unite(lin(1, normale, 0.55, Y)), texte: choisi && g.ferm ? texte : (segs.length > 7 && !choisi ? String(i + 1) : texte) });
+      }
+      if ((choisi || opt.detail) && g.ferm && hab && g.type !== 'te' && g.type !== 'boite') {
+        var pf, nf2;
+        if (g.type === 'coude') {
+          var A2 = g.q.angle * RAD / 2;
+          var dm = lin(-Math.cos(A2), g.n, Math.sin(A2), g.d0), co = croix([-g.n[0], -g.n[1], -g.n[2]], g.d0);
+          nf2 = lin(Math.cos(g.ferm.theta * RAD), dm, Math.sin(g.ferm.theta * RAD), co);
+          pf = lin(1, g.centre, g.R, dm, q.rp * 1.02, nf2, 1, dec);
+        } else {
+          var fr = repere(g.d0);
+          nf2 = lin(Math.cos(g.ferm.theta * RAD), fr[0], Math.sin(g.ferm.theta * RAD), fr[1]);
+          pf = lin(1, p0, (g.Lv || 0) * 0.3, g.d0, q.rp * 1.02, nf2);
+        }
+        cotes.push({ p: pf, vers: unite(lin(1, nf2, opt.detail ? 0.35 : -0.7, Y)), n: nf2, texte: 'Fermeture' });
+      }
+    });
+
+    /* bouts libres : tube qui dépasse et tranche de laine */
+    m.piece = -1; m.plus = 0;
+    if (dernier >= 0) {
+      var a0 = segs[0], q0 = rayons(a0.s);
+      if (!opt.eclate && a0.type !== 'fond') { extremite(a0.p0, a0.d0, a0.s, 'debut'); acierDroit(a0.p0, a0.d0, -q0.ro, 0, a0.s); }
+      if (!opt.eclate && segs[dernier].type !== 'fond') { extremite(geo.p, geo.d, geo.s, 'fin'); acierDroit(geo.p, geo.d, 0, rayons(geo.s).ro, geo.s); }
+    } else {
+      var vide = p.vide, qv = rayons(vide);
+      coquille(m, droite(O, X, Y, Z, -vide.D, vide.D), qv.ri, qv.ro); acier(m, droite(O, X, Y, Z, -vide.D * 1.4, vide.D * 1.4), qv.rs);
+    }
+    var D = segs.length ? segs[0].s.D : p.vide.D;
+    if (opt.detail && segs.length) {   /* diamètre fini, au bout */
+      var fin = segs[segs.length - 1].type === 'fond' ? segs[0] : null, o = fin ? fin.p0 : geo.p, dirF = fin ? fin.d0 : geo.d, rF = (fin ? fin.s.D : geo.s.D) / 2;
+      var rf = repere(dirF), loin = lin(1, o, (fin ? -1 : 1) * rF * 1.25, dirF);
+      cotes.push({ a: plus3(loin, rf[0], -rF), b: plus3(loin, rf[0], rF), ea: plus3(o, rf[0], -rF), eb: plus3(o, rf[0], rF), pousse: dirF, texte: 'Ø ' + p.diametre });
+    }
+    /* marge : les étiquettes restent au-dessus des boutons de zoom */
+    return { m: m, cotes: cotes, angles: [-0.5, 0.42], marge: [0.41, 0.34], monte: 0.05, tuile: D * 1.4 };
+  }
+
+  function modeleBiblio(p, opt) {
+    var tous = p.morceaux, nb = tous.length;
+    if (!nb) return { m: new Maillage(), cotes: [], angles: [-0.32, 0.4], marge: [0.4, 0.36], tuile: 100 };
+    var seul = typeof opt.choix === 'number' && tous[opt.choix] ? opt.choix : null;
+    var liste = seul === null ? tous.map(function (x, i) { return i; }) : [seul];
+    var sous = liste.map(function (i) {
+      var x = modeleEnsemble(tous[i], { pvc: opt.pvc, eclate: opt.eclate, choix: null, detail: seul !== null });
+      var v = x.m.v, min = [1e9, 1e9, 1e9], max = [-1e9, -1e9, -1e9];
+      for (var j = 0; j < v.length; j += 7) for (var k = 0; k < 3; k++) { if (v[j + k] < min[k]) min[k] = v[j + k]; if (v[j + k] > max[k]) max[k] = v[j + k]; }
+      x.i = i; x.min = min; x.max = max;
+      return x;
+    });
+    var taille = function (x) { return Math.max(x.max[0] - x.min[0], x.max[1] - x.min[1], x.max[2] - x.min[2]) || 1; };
+    var reference = Math.max.apply(null, sous.map(taille));
+    sous.forEach(function (x) {
+      var k = reference / taille(x) * 0.92 + 0.08, v = x.m.v;
+      for (var j = 0; j < v.length; j += 7) { v[j] *= k; v[j + 1] *= k; v[j + 2] *= k; }
+      x.min = [x.min[0] * k, x.min[1] * k, x.min[2] * k]; x.max = [x.max[0] * k, x.max[1] * k, x.max[2] * k];
+      x.k = k;
+      x.cotes.forEach(function (c) { ['p', 'a', 'b', 'ea', 'eb'].forEach(function (n) { if (c[n]) c[n] = [c[n][0] * k, c[n][1] * k, c[n][2] * k]; }); });
+    });
+    var cw = Math.max.apply(null, sous.map(function (x) { return x.max[0] - x.min[0]; })) * 1.22;
+    var ch = Math.max.apply(null, sous.map(function (x) { return x.max[1] - x.min[1] + (x.max[2] - x.min[2]) * 0.35; })) * 1.3;
+    var cols = Math.ceil(Math.sqrt(sous.length * Math.max(0.35, Math.min(2.5, ch / cw))));
+    cols = Math.max(1, Math.min(sous.length, cols));
+    var ligs = Math.ceil(sous.length / cols), M_ = new Maillage(), cotes = [];
+    sous.forEach(function (x, n) {
+      var cible = [(n % cols - (cols - 1) / 2) * cw, ((ligs - 1) / 2 - Math.floor(n / cols)) * ch, 0];
+      var t = [0, 1, 2].map(function (k) { return cible[k] - (x.min[k] + x.max[k]) / 2; });
+      var v = x.m.v;
+      for (var j = 0; j < v.length; j += 7) M_.v.push(v[j] + t[0], v[j + 1] + t[1], v[j + 2] + t[2], v[j + 3], v[j + 4], v[j + 5], v[j + 6]);
+      for (var q = 0; q < x.m.pieces.length; q++) M_.pieces.push(x.i);
+      if (seul === null) {
+        cotes.push({ p: [cible[0], cible[1] + (x.max[1] - x.min[1]) / 2, 0], vers: [0, 1, 0.1], texte: tous[x.i].nom });
+      } else {
+        x.cotes.forEach(function (c) {
+          var o = Object.assign({}, c);
+          ['p', 'a', 'b', 'ea', 'eb'].forEach(function (k) { if (o[k]) o[k] = plus3(o[k], t, 1); });
+          cotes.push(o);
+        });
+      }
+    });
+    var D = tous[liste[0]].geo.segments[0].s.D * sous[0].k;
+    /* un morceau seul : de côté s'il tourne vers le haut ou le bas, de dessus s'il est « à plat » */
+    var angles = [-0.28, 0.36];
+    if (seul !== null) {
+      var virages = tous[seul].geo.segments.filter(function (g) { return g.n; });
+      angles = virages.length && virages.every(function (g) { return Math.abs(g.n[1]) < 0.4; }) ? [-0.12, 0.95] : [-0.14, 0.2];
+    }
+    return { m: M_, cotes: cotes, angles: angles, marge: seul === null ? [0.43, 0.36] : [0.33, 0.31], tuile: D * 1.4 };
+  }
+
+  var FABRIQUES = { droit: modeleDroit, coude: modeleCoude, piquage: modelePiquage, ensemble: modeleBiblio };
 
   /* reglages : pvc (affiché au départ), libre (zoom et déplacement), bouton (retour à la vue de départ) */
   var ICONE_PLEIN = '<svg viewBox="0 0 20 20"><path d="M3.5 7.5v-4h4M16.5 7.5v-4h-4M3.5 12.5v4h4M16.5 12.5v4h-4"/></svg>';
@@ -576,6 +879,7 @@
       if (!W || !H) return;
       var a = angles(), R = rotation(a[0], a[1]);
       var ech = zoom * Math.min(echelle(R, W, H), echelle(rotation(modele.angles[0], modele.angles[1]), W, H));
+      var cadrage = modele.monte ? [pan[0], pan[1] - H * modele.monte] : pan;
       vu = { R: R, ech: ech, W: W, H: H };
       if (gl) {
         var dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -587,14 +891,15 @@
         gl.uniformMatrix3fv(loc.R, false, [R[0][0], R[1][0], R[2][0], R[0][1], R[1][1], R[2][1], R[0][2], R[1][2], R[2][2]]);
         gl.uniform3f(loc.c, centre[0], centre[1], centre[2]);
         gl.uniform3f(loc.e, 2 * ech / W, 2 * ech / H, 0.9 / rayon);
-        gl.uniform2f(loc.d, 2 * pan[0] / W, -2 * pan[1] / H);
+        gl.uniform2f(loc.d, 2 * cadrage[0] / W, -2 * cadrage[1] / H);
         var axe = modele.axe || X, trous = modele.trous || [0, 0];
         gl.uniform3f(loc.axe, axe[0], axe[1], axe[2]);
         gl.uniform2f(loc.trou, trous[0], trous[1]);
-        gl.uniform1f(loc.tuile, rayon * 0.85);
+        gl.uniform1f(loc.tuile, modele.tuile || rayon * 0.85);
         gl.drawArrays(gl.TRIANGLES, 0, modele.m.v.length / 7);
       }
-      if (opt.cotes) etiquettes(calque, modele, R, centre, ech, W, H, pan);
+      vu.pan = cadrage;
+      if (opt.cotes) etiquettes(calque, modele, R, centre, ech, W, H, cadrage);
       else calque.innerHTML = '';
     }
     function demander() { if (!prevu) { prevu = true; requestAnimationFrame(dessiner); } }
@@ -604,13 +909,15 @@
       if (donnees.textesPVC) donnees.textes = opt.pvc ? donnees.textesPVC : donnees.textesLaine;
       if (fiche) {
         var nb = donnees.fiches.length;
-        if (choix === undefined || (choix !== null && choix >= nb)) choix = nb > 2 ? 1 : 0;
+        if (reglages.depart !== undefined) { if (choix === undefined || (choix !== null && choix >= nb)) choix = reglages.depart; }
+        else if (choix === undefined || (choix !== null && choix >= nb)) choix = nb > 2 ? 1 : 0;
         opt.choix = choix;
         afficherChoix();
       }
       modele = FABRIQUES[type](donnees, opt);
       var v = modele.m.v, min = [1e9, 1e9, 1e9], max = [-1e9, -1e9, -1e9], i, k;
       for (i = 0; i < v.length; i += 7) for (k = 0; k < 3; k++) { if (v[i + k] < min[k]) min[k] = v[i + k]; if (v[i + k] > max[k]) max[k] = v[i + k]; }
+      if (!v.length) { min = [-1, -1, -1]; max = [1, 1, 1]; }     /* zone vide */
       centre = lin(0.5, min, 0.5, max);
       rayon = 0.5 * Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) || 1;
       if (gl) {
@@ -621,10 +928,11 @@
         gl.vertexAttribPointer(loc.m, 1, gl.FLOAT, false, 28, 24);
       }
       el.querySelectorAll('[data-pvc]').forEach(function (b) { b.setAttribute('aria-pressed', String((b.dataset.pvc === '1') === opt.pvc)); });
+      if (donnees.habillage) el.querySelector('[data-pvc="1"]').textContent = donnees.habillage;
       el.querySelectorAll('[data-opt]').forEach(function (b) { b.setAttribute('aria-pressed', String(opt[b.dataset.opt])); });
-      var aide = reglages.libre ? (reglages.selection ? 'Touchez un morceau pour le sélectionner. ' : '') + 'Un doigt pour tourner, deux doigts pour zoomer et déplacer ; boutons + et −, ou ⤢ pour le plein écran ; « ' + reglages.bouton + ' » pour revenir. '
+      var aide = reglages.libre ? (reglages.selection && !reglages.mot ? 'Touchez un morceau pour le sélectionner. ' : '') + 'Un doigt pour tourner, deux doigts pour zoomer et déplacer ; boutons + et −, ou ⤢ pour le plein écran ; « ' + reglages.bouton + ' » pour revenir. '
         : 'Glissez pour faire tourner, touchez deux fois pour recentrer. ';
-      legende.textContent = (gl ? aide + 'Les cotes des faces cachées sont masquées. ' : 'La 3D n’est pas disponible sur cet appareil. ') +
+      legende.textContent = (reglages.court ? (gl ? '' : 'La 3D n’est pas disponible sur cet appareil. ') : (gl ? aide + 'Les cotes des faces cachées sont masquées. ' : 'La 3D n’est pas disponible sur cet appareil. ')) +
         (opt.pvc ? donnees.legendePVC : donnees.legendeLaine);
       dessiner();
     }
@@ -633,13 +941,13 @@
       var boutons = ['<button type="button" data-morceau="tous">Tous</button>'].concat(donnees.fiches.map(function (f, i) {
         return '<button type="button" data-morceau="' + i + '" aria-label="' + f.titre + '">' + (i + 1) + '</button>';
       }));
-      morceaux.innerHTML = '<span>Morceau</span>' + boutons.join('');
+      morceaux.innerHTML = '<span>' + (reglages.mot || 'Morceau') + '</span>' + boutons.join('');
       morceaux.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.morceau === (choix === null ? 'tous' : String(choix)))); });
-      if (choix === null) { fiche.innerHTML = '<p>Touchez un morceau du coude, ou son numéro, pour isoler ses cotes.</p>'; return; }
+      if (choix === null) { fiche.innerHTML = '<p>' + (reglages.invite || 'Touchez un morceau du coude, ou son numéro, pour isoler ses cotes.') + '</p>'; return; }
       var f = donnees.fiches[choix];
-      fiche.innerHTML = '<h3>' + f.titre + '</h3><div>' + f.cotes.map(function (c) { return '<p><span>' + c[0] + '</span><b>' + c[1] + '</b> <small>' + f.unite + '</small></p>'; }).join('') + '</div>';
+      fiche.innerHTML = '<h3>' + f.titre + '</h3><div>' + f.cotes.map(function (c) { return '<p><span>' + c[0] + '</span><b>' + c[1] + '</b> <small>' + (c[2] !== undefined ? c[2] : f.unite) + '</small></p>'; }).join('') + '</div>';
     }
-    function choisirMorceau(i) { choix = i; construire(); }
+    function choisirMorceau(i) { choix = i; construire(); if (reglages.surChoix) reglages.surChoix(choix); }
     if (morceaux) {
       morceaux.addEventListener('click', function (ev) {
         var b = ev.target.closest('button'); if (!b) return;
@@ -650,7 +958,7 @@
     /* morceau visible au point touché : on cherche le triangle le plus proche de l'observateur */
     function morceauSous(px, py) {
       if (!vu || !modele) return -1;
-      var v = modele.m.v, R = vu.R, e = vu.ech, ox = vu.W / 2 + pan[0], oy = vu.H / 2 + pan[1];
+      var v = modele.m.v, R = vu.R, e = vu.ech, ox = vu.W / 2 + vu.pan[0], oy = vu.H / 2 + vu.pan[1];
       var mieux = -1e18, trouve = -1, X_ = [0, 0, 0], Y_ = [0, 0, 0], Z_ = [0, 0, 0];
       for (var t = 0; t < modele.m.pieces.length; t++) {
         for (var k = 0; k < 3; k++) {
@@ -757,7 +1065,7 @@
     if (window.ResizeObserver) new ResizeObserver(demander).observe(zone);
 
     initGL();
-    return { el: el, definir: function (d) { donnees = d; construire(); } };
+    return { el: el, definir: function (d) { donnees = d; construire(); }, choisir: function (i) { choix = i; } /* pris en compte au prochain definir */ };
   }
 
   root.Scene3D = { creer: creer, textureLaine: textureLaine };

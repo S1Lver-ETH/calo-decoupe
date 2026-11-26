@@ -803,7 +803,7 @@
   }
 
   /* ---------- rendu & événements ---------- */
-  var RENDUS = { droit: rendreDroit, coude: rendreCoude, piquage: rendrePiquage, memo: function () {} };
+  var RENDUS = { droit: rendreDroit, coude: rendreCoude, piquage: rendrePiquage, cote: function () { window.Cote.rendre(); }, memo: function () {} };
 
   function presser(zone, valeur) {
     $(zone).querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', String(+b.dataset.v === +valeur)); });
@@ -823,10 +823,12 @@
 
   function rendre() {
     var onglet = RENDUS[S.tab] ? S.tab : 'droit';
-    $('base').hidden = onglet === 'memo';
-    var valide = S.coq > 0 && S.e > 0 && S.recouv >= 0;
+    $('base').hidden = onglet === 'memo' || onglet === 'cote';
+    /* la page Cote a ses propres réglages, enregistrés avec chaque relevé */
+    var valide = onglet === 'cote' || (S.coq > 0 && S.e > 0 && S.recouv >= 0);
     if (valide) {
-      resume(); RENDUS[onglet](); adapterBoutons();
+      if (onglet !== 'cote') resume();
+      RENDUS[onglet](); adapterBoutons();
       if (window.Widgets && $('out-' + onglet)) window.Widgets.organiser($('out-' + onglet), onglet);
       animer($('p-' + onglet));
     }
@@ -845,6 +847,7 @@
 
   function onglet(nom, defiler) {
     if (!RENDUS[nom]) nom = 'droit';
+    if (nom !== 'cote' && window.Cote) window.Cote.quitter();
     S.tab = nom;
     document.querySelectorAll('.tabs button').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.tab === nom)); });
     document.querySelectorAll('.panel').forEach(function (p) { p.classList.toggle('active', p.id === 'p-' + nom); });
@@ -953,6 +956,13 @@
     window.addEventListener('hashchange', function () { onglet(location.hash.slice(1), true); });
     onglet(location.hash.slice(1) || S.tab);
   }
+
+  /* outils partagés avec la page Cote */
+  window.Outils = {
+    lg: lg, un: un, avertir: avertir, dessinPVC: dessinPVC,
+    base: function () { return { dn: tubeDe(S.tube) ? S.tube : 50, coq: tubeDe(S.tube) ? S.coq : 60, e: S.e }; },
+    gabarit: function (id, forme) { gabarits[id] = forme; (HEBERGE ? telecharger : imprimer)(id); }
+  };
 
   init();
 })();

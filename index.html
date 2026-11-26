@@ -6,7 +6,7 @@
   <title>Calo Découpe — traçage pour calorifugeurs</title>
   <meta name="description" content="Cotes de coupe des coquilles de laine et développés PVC pour tuyauteries acier : parties droites, coudes en secteurs, piquages.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22if%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ffc658%22%2F%3E%3Cstop%20offset%3D%22.52%22%20stop-color%3D%22%23f9861a%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23d6440c%22%2F%3E%3C%2FlinearGradient%3E%3ClinearGradient%20id%3D%22ip%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ffffff%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffe6c7%22%2F%3E%3C%2FlinearGradient%3E%3ClinearGradient%20id%3D%22ic%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%2334425e%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23111a2c%22%2F%3E%3C%2FlinearGradient%3E%3ClinearGradient%20id%3D%22ir%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%22.5%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%220%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2218%22%20fill%3D%22url(%23if)%22%2F%3E%3Cpath%20fill%3D%22url(%23ir)%22%20d%3D%22M0%2018C0%208%208%200%2018%200h28c10%200%2018%208%2018%2018v5C45%2034%2021%2021%200%2033Z%22%2F%3E%3Cg%20fill%3D%22url(%23ip)%22%20stroke%3D%22url(%23ip)%22%20stroke-width%3D%221.4%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M30%2053.2H50V32.8L30%2041.1Z%22%2F%3E%3Cpath%20d%3D%22M10.8%2014H31.2L22.9%2034H10.8Z%22%2F%3E%3C%2Fg%3E%3Cpath%20class%3D%22coupe%22%20fill%3D%22url(%23ic)%22%20stroke%3D%22url(%23ic)%22%20stroke-width%3D%221.4%22%20stroke-linejoin%3D%22round%22%20d%3D%22M32.8%2037.2L52.6%2029L35%2011.4L26.8%2031.2Z%22%2F%3E%3C%2Fsvg%3E">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=10">
   <style>
     /* remplissages des dessins : déclarés ici pour que url(#…) désigne les motifs de la page */
     .draw .s-wool { fill: url(#laine); } .draw .s-wool2 { fill: url(#laine2); }
@@ -24,6 +24,7 @@
       <button role="tab" data-tab="droit"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5h17v9h-17zM7.5 7.5v3M11.5 7.5v4.5M15.5 7.5v3"/></svg><span>Développés</span></button>
       <button role="tab" data-tab="coude"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 3.5v6.5a9.5 9.5 0 0 0 9.5 9.5h6.5M9.5 3.5v6.5a4.5 4.5 0 0 0 4.5 4.5h6.5"/></svg><span>Coude</span></button>
       <button role="tab" data-tab="piquage"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 13.5h19M2.5 19h19M9.5 13.5V4M14.5 13.5V4"/></svg><span>Pénétrant</span></button>
+      <button role="tab" data-tab="cote"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 6v12M20.5 6v12M3.5 12h17M7 8.5 3.5 12 7 15.5M17 8.5l3.5 3.5-3.5 3.5"/></svg><span>Cote</span></button>
       <button role="tab" data-tab="memo"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12v17H6zM9 8.5h6M9 12h6M9 15.5h3.5"/></svg><span>Mémo</span></button>
     </nav>
     <div class="outils">
@@ -146,6 +147,71 @@
       <div id="out-piquage"></div>
     </section>
 
+    <!-- Prise de cotes -->
+    <section class="panel" id="p-cote" role="tabpanel">
+      <div class="head">
+        <h1>Prise de cotes</h1>
+      </div>
+      <div class="bascule finition" id="coteFinition" role="group" aria-label="Finition">
+        <button type="button" data-finition="tole">Tôle</button><button type="button" data-finition="pvc">PVC</button>
+      </div>
+
+      <div id="coteTole">
+        <div id="out-cote">
+          <div class="full" data-scene id="cote-scene"></div>
+          <section class="card full">
+            <h2>Vue 2D des morceaux</h2>
+            <div id="cote2d"></div>
+          </section>
+          <section class="card full">
+            <h2>Tôle à plat et découpes</h2>
+            <div id="cotePlat"></div>
+          </section>
+        </div>
+        <!-- placé sous le modèle 3D au démarrage -->
+        <div id="cmZone">
+          <div class="actions deux" id="cmSelection" hidden>
+            <span id="cmChoisi"></span>
+            <button type="button" class="btn primary" data-act="modifier">Modifier</button>
+            <button type="button" class="btn" data-act="jeter">Supprimer</button>
+          </div>
+          <button type="button" class="micro" id="cmAjouter" data-act="ajouter"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M8.5 21h7"/></svg><span>Ajouter un nouveau morceau</span></button>
+          <div id="cmPanneau" hidden>
+            <h3 id="cmTitre"></h3>
+            <button type="button" class="micro" id="cmMicro" data-act="micro" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M8.5 21h7"/></svg><span>Reprendre la dictée</span></button>
+            <p class="note" id="cmInfo" aria-live="polite"></p>
+            <label class="field wide"><span>Ce qui est dit (modifiable)</span><textarea id="cmTexte" rows="3"></textarea></label>
+            <div id="cmCompris" aria-live="polite"></div>
+            <details class="plus">
+              <summary>Corriger à la main</summary>
+              <div id="cmMain"></div>
+            </details>
+            <div class="actions deux"><button type="button" class="btn primary" id="cmOk" data-act="ok">OK</button><button type="button" class="btn" data-act="abandon">Annuler</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="cotePvc" hidden>
+        <button type="button" class="micro grand" id="pvcMicro" data-act="pvc" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M8.5 21h7"/></svg><span>Commencer la prise de cotes</span></button>
+        <p class="note" id="pvcInfo" aria-live="polite"></p>
+        <div id="pvcSaisie" hidden>
+          <label class="field wide"><span>Ce qui est dit (modifiable)</span><textarea id="pvcTexte" rows="3" placeholder="En 60-40, 4 coudes et 12 mètres, puis en 42-20, 6 coudes PVC"></textarea></label>
+          <div id="pvcDoutes" aria-live="polite"></div>
+        </div>
+        <div id="pvcRestes" aria-live="polite"></div>
+        <div id="out-cote-pvc">
+          <section class="card full">
+            <h2>Ce qui a été dit</h2>
+            <div id="pvcListe"></div>
+          </section>
+          <section class="card full">
+            <h2>Récapitulatif à prendre</h2>
+            <div id="pvcRecap"></div>
+          </section>
+        </div>
+      </div>
+    </section>
+
     <!-- Mémo -->
     <section class="panel" id="p-memo" role="tabpanel">
       <div class="head">
@@ -180,6 +246,14 @@
           </ul>
         </article>
         <article class="card">
+          <h2>Agent IA pour la dictée</h2>
+          <p class="note" id="iaEtat"></p>
+          <p class="note">Facultatif. L’agent IA Claude comprend les phrases libres de la dictée tôle. Il lui faut votre clé API Anthropic : chaque dictée est facturée sur votre compte (quelques centimes) et envoyée à Anthropic. La clé reste dans ce navigateur : fixez une limite de dépense sur le compte.</p>
+          <label class="coche"><input type="checkbox" id="iaActif"> Utiliser l’agent IA Claude</label>
+          <label class="field wide"><span>Votre clé API Anthropic</span><input id="iaCle" type="password" autocomplete="off" spellcheck="false" placeholder="à coller par vous-même"></label>
+          <div class="actions"><button type="button" class="btn" id="iaOublier">Effacer la clé</button></div>
+        </article>
+        <article class="card">
           <h2>Sécurité</h2>
           <ul>
             <li>Gants, lunettes, masque anti-poussières et manches longues pour la découpe de laine.</li>
@@ -196,10 +270,14 @@
 
   <div id="print" aria-hidden="true"></div>
 
-  <script src="calc.js"></script>
-  <script src="scene3d.js"></script>
-  <script src="widgets.js"></script>
-  <script src="app.js"></script>
-  <script src="effets.js"></script>
+  <script src="calc.js?v=10"></script>
+  <script src="scene3d.js?v=10"></script>
+  <script src="cote-calc.js?v=10"></script>
+  <script src="plans.js?v=10"></script>
+  <script src="agent.js?v=10"></script>
+  <script src="cote.js?v=10"></script>
+  <script src="widgets.js?v=10"></script>
+  <script src="app.js?v=10"></script>
+  <script src="effets.js?v=10"></script>
 </body>
 </html>
