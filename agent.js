@@ -30,7 +30,7 @@
 
   var CONSIGNES = [
     'Tu es l’assistant de prise de cotes d’un calorifugeur-tôlier en chaufferie (isolant en laine minérale, habillage PVC ou tôle).',
-    'Tu reçois le morceau actuel en JSON et une dictée en français, souvent issue de la reconnaissance vocale (mots déformés possibles : « coup » = coude, « coup d’aplat » = coude à plat).',
+    'Tu reçois le morceau actuel en JSON et une dictée en français, souvent issue de la reconnaissance vocale (mots déformés possibles : « coup » ou « code » = coude, « coup d’aplat » = coude à plat, « lait » ou « les » = laine, « taule » = tôle, « vendre » = ventre, « sessions » = sections).',
     '« Tuyau en 60-40 » signifie coquille de diamètre intérieur coq = 60 et épaisseur isolant e = 40. « Coude en tête » = coude qui part vers le haut.',
     'Un morceau est souvent une seule pièce ; ne rajoute aucune partie droite qui n’est pas dictée.',
     'Renvoie l’ensemble COMPLET mis à jour : conserve les pièces existantes sans les modifier, sauf si la dictée demande de changer, supprimer ou réordonner.',

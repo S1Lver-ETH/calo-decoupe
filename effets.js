@@ -10,7 +10,8 @@
   function rebond(el) {
     if (!el.animate) return;
     if (el.tagName === 'TR') {
-      el.animate([{ backgroundColor: 'rgba(255,164,44,.34)' }, { backgroundColor: 'rgba(255,164,44,0)' }], { duration: 650, easing: 'ease-out' });
+      var l = getComputedStyle(document.documentElement).getPropertyValue('--lueur').trim() || '255, 164, 44';
+      el.animate([{ backgroundColor: 'rgba(' + l + ', .34)' }, { backgroundColor: 'rgba(' + l + ', 0)' }], { duration: 650, easing: 'ease-out' });
       return;
     }
     var ampleur = el.matches('input, select') ? 0.012 : el.matches('.stat, .cotes > div, .fiche > div > p') ? 0.028 : 0.05;

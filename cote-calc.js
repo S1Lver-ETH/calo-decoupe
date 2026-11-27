@@ -358,13 +358,50 @@
     return out.join(' ');
   }
 
+  /* mots mal entendus par la reconnaissance vocale : [motif, mot voulu, groupe gardé devant] */
+  var QTE = '((?:\\d+(?:\\.\\d+)? ?(?:metres?|m|coudes?|coquilles?)|coudes?|coquilles?|metres?)(?: de| en)?)';
+  var SUITE = '(?= *(?:$|,|\\.|;|\\bet\\b|\\bpuis\\b|\\bensuite\\b|\\d|\\ben \\d))';
+  var ECOUTE = [
+    [/\b(?:lait|laits|laid|laids|laie|laies|lais|lene|lenne|leine|lane|lanne|laines|lainee|l aine|l haine|l ene)\b/g, 'laine', 0],
+    [new RegExp('\\b' + QTE + ' (?:les|le|lai|lay|l est|lest|haine|aine|laisse)\\b' + SUITE, 'g'), 'laine', 1],
+    [/\b(de|en) (?:les|le|lai|l est|haine)\b(?= *(?:$|,|\.|;|\bet\b|\bpuis\b|\d))/g, 'laine', 1],
+    [/\bpe ?ve ?ce\b|\bpe ?ve ?se\b|\bpeveces?\b|\bp v c\b|\bp vc\b|\bpv c\b|\bp ?b ?c\b|\bb ?v ?c\b|\bp ?v ?s\b|\bpvcs\b|\bp w c\b|\bpwc\b/g, 'pvc', 0],
+    [/(\d+) (?:codes|cous|coutes|coules|coudres|couds)\b/g, 'coudes', 1],
+    [/(\d+|une?) (?:code|cou|coute|coule|coudre)\b/g, 'coude', 1],
+    [/\bcoudres?\b/g, 'coude', 0],
+    [/\bcodes? (?=pvc|laine|a \d|en \d|de \d)/g, 'coude ', 0],
+    [/(\d+(?:\.\d+)?) (?:mettre|mettres|maitre|maitres|metro|metros)\b/g, 'metres', 1],
+    [/(\d+) (?:sessions?|cessions?)\b/g, 'sections', 1],
+    [/\bco ?quil+e\b/g, 'coquille', 0], [/\bco ?quil+es\b/g, 'coquilles', 0],
+    [/\b(?:taules?|tolle|tol)\b/g, 'tole', 0],
+    [/\b(en|de|au) (?:vendre|vente|ventres)\b/g, 'ventre', 1],
+    [/\b(en|de|au) (?:do|d eau|deau|dot)\b(?! \d)/g, 'dos', 1],
+    [/\b(?:picage|piquages?|piquet|piquets)\b/g, 'piquage', 0]
+  ];
+  var entendus = [];
+  function corriger(s) {
+    var notes = [];
+    ECOUTE.forEach(function (r) {
+      s = s.replace(r[0], function () {
+        var m = arguments[0], devant = r[2] ? arguments[r[2]] : '';
+        var mot = m.slice(devant.length).trim(), vers = r[1].trim();
+        if (mot !== vers && notes.every(function (n) { return n[0] !== mot; })) notes.push([mot, vers]);
+        return (devant ? devant + ' ' : '') + r[1];
+      });
+    });
+    return { s: s, notes: notes };
+  }
+
   function preparer(texte) {
     var s = ' ' + String(texte).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '') + ' ';
+    s = s.replace(/\bp\. ?v\. ?c\.?/g, 'pvc');
     s = s.replace(/(\d),(\d)/g, '$1.$2').replace(/[’']/g, ' ').replace(/-/g, ' ').replace(/°/g, ' degres ');
     s = s.replace(/,/g, ' , ').replace(/([;!?\n:])/g, ' $1 ').replace(/\.(?!\d)/g, ' . ').replace(/[ \t]+/g, ' ');
     s = chiffres(s.replace(/\n/g, ' ; '));
     s = ' ' + s + ' ';
     s = s.replace(/(\d+) virgule (\d+)/g, '$1.$2');
+    var c = corriger(s);
+    s = c.s; entendus = c.notes;
     /* tournures fréquentes, dont les erreurs de la reconnaissance vocale */
     s = s.replace(/\bcoup d ?a ?plat\b|\bcoup a plat\b|\bcoude d ?aplat\b/g, 'coude a plat').replace(/\bcoud\b/g, 'coude');
     s = s.replace(/\bcoups? (?:de )?(?=en |a |\d|d |de |pvc|laine)/g, 'coude ').replace(/\bcoups\b/g, 'coudes').replace(/\bcoup\b/g, 'coude');
@@ -546,7 +583,8 @@
     var faits = [], doutes = [];
     var dire = function (t) { if (t.charAt(0) === '?') doutes.push(t.slice(1)); else faits.push(t); };
     var recueillir = function (liste) { liste.forEach(dire); };
-    var chunks = preparer(texte).split(/ (?:\.|;|!|\?|puis|ensuite|apres ca|apres cela|apres|suivi d un|suivi d une|suivi de) /);
+    var chunks = preparer(texte), notes = entendus.slice();
+    chunks = chunks.split(/ (?:\.|;|!|\?|puis|ensuite|apres ca|apres cela|apres|suivi d un|suivi d une|suivi de) /);
 
     chunks.forEach(function (brut) {
       var s = ' ' + brut.replace(/ , /g, ' ').replace(/\s+/g, ' ').trim() + ' ';
@@ -612,7 +650,7 @@
         if (k.type === 'droit' && lu.a.longueur === undefined) doutes.push('Pièce ' + r.pieces.length + ' : longueur non dite, 1 000 mm par défaut.');
       });
     });
-    return { releve: r, faits: faits, doutes: doutes.filter(function (d, i) { return doutes.indexOf(d) === i; }) };
+    return { releve: r, faits: faits, doutes: doutes.filter(function (d, i) { return doutes.indexOf(d) === i; }), corrections: notes };
   }
 
   /* ---------- métré PVC / laine : « en 60-40, 4 coudes et 12 mètres » ---------- */
@@ -621,7 +659,7 @@
     var entrees = JSON.parse(JSON.stringify(base || [])), doutes = [];
     var dernier = entrees[entrees.length - 1];
     var cur = { coq: dernier ? dernier.coq : 0, e: dernier ? dernier.e : 0 };
-    var s = preparer(texte).replace(/\b(?:un|une) (?=coudes?|coquilles?)/g, '1 ');
+    var s = preparer(texte).replace(/\b(?:un|une) (?=coudes?|coquilles?)/g, '1 '), notes = entendus.slice();
     var phrases = s.split(/ (?:\.|;|!|\?|puis|ensuite|apres ca|apres cela|apres) /);
 
     phrases.forEach(function (phrase) {
@@ -701,7 +739,7 @@
     });
     if (entrees.some(function (x) { return !x.coq; })) doutes.push('Diamètre non dit pour une ligne : dites par exemple « en 60-40 ».');
     else if (entrees.some(function (x) { return !x.e; })) doutes.push('Épaisseur non dite pour une ligne.');
-    return { entrees: entrees, doutes: doutes.filter(function (d, i) { return doutes.indexOf(d) === i; }) };
+    return { entrees: entrees, doutes: doutes.filter(function (d, i) { return doutes.indexOf(d) === i; }), corrections: notes };
   }
 
   /* totaux rangés par diamètre puis épaisseur */
@@ -720,6 +758,6 @@
     metre: metre, recapitulatif: recapitulatif, poserCoquille: poserCoquille, COQ: COQ,
     TYPES: TYPES, SENS: SENS, FERMETURES: FERMETURES, MATIERES: MATIERES,
     nouveau: nouveau, piece: piece, normaliser: normaliser, geometrie: geometrie, debit: debit,
-    interpreter: interpreter, preparer: preparer, resumePiece: resumePiece, texteFermeture: texteFermeture, nomDirection: nomDirection
+    interpreter: interpreter, preparer: preparer, corriger: corriger, resumePiece: resumePiece, texteFermeture: texteFermeture, nomDirection: nomDirection
   };
 })(this);

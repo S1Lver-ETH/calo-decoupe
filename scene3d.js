@@ -441,7 +441,7 @@
   }
 
   function etiquettes(vue, modele, R, centre, ech, W, H, pan) {
-    var boites = [], sortie = '';
+    var boites = [[W - 90, 0, 90, 50]], sortie = '';   /* le coin du bouton clair / sombre reste libre */
     function proj(p) { var q = tourner(R, lin(1, p, -1, centre)); return [W / 2 + pan[0] + q[0] * ech, H / 2 + pan[1] - q[1] * ech]; }
     function dehorsDuCadre(P) { return P[0] < -10 || P[0] > W + 10 || P[1] < -10 || P[1] > H + 10; }
     function largeur(texte) { return texte.length * 6.5 + 14; }
@@ -809,6 +809,30 @@
   /* reglages : pvc (affiché au départ), libre (zoom et déplacement), bouton (retour à la vue de départ) */
   var ICONE_PLEIN = '<svg viewBox="0 0 20 20"><path d="M3.5 7.5v-4h4M16.5 7.5v-4h-4M3.5 12.5v4h4M16.5 12.5v4h-4"/></svg>';
   var ICONE_FERMER = '<svg viewBox="0 0 20 20"><path d="M5 5l10 10M15 5L5 15"/></svg>';
+  /* fond des vues 3D : le choix vaut pour toutes les vues et reste mémorisé ; sans choix, il suit le thème */
+  var CLE_FOND = 'calo-fond-3d', vues = [], fondMemo = null;
+  var ICONE_SOLEIL = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.3 5.3 7 7M17 17l1.7 1.7M18.7 5.3 17 7M7 17l-1.7 1.7"/></svg>';
+  var ICONE_LUNE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>';
+  var BOUTONS_FOND = '<div class="fond-3d" role="group" aria-label="Fond de la vue 3D"><button type="button" data-fond="clair" aria-label="Fond clair">' + ICONE_SOLEIL + '</button><button type="button" data-fond="sombre" aria-label="Fond sombre">' + ICONE_LUNE + '</button></div>';
+  function fondActuel() {
+    var v = fondMemo;
+    if (!v) { try { v = localStorage.getItem(CLE_FOND); } catch (err) { /* stockage indisponible */ } }
+    return v === 'clair' || v === 'sombre' ? v : (document.documentElement.dataset.theme === 'dark' ? 'sombre' : 'clair');
+  }
+  function peindreFonds() {
+    var f = fondActuel();
+    vues.forEach(function (z) {
+      z.dataset.fond = f;
+      z.querySelectorAll('.fond-3d button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.fond === f)); });
+    });
+  }
+  function choisirFond(f) {
+    fondMemo = f;
+    try { localStorage.setItem(CLE_FOND, f); } catch (err) { /* stockage indisponible */ }
+    peindreFonds();
+  }
+  if (root.MutationObserver) new MutationObserver(peindreFonds).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
   function creer(type, titre, avecEclate, reglages) {
     reglages = reglages || {};
     var el = document.createElement('figure');
@@ -819,7 +843,7 @@
       '<button type="button" class="option" data-opt="cotes">Cotes</button>' +
       (reglages.bouton ? '<button type="button" class="option" data-vue="depart">' + reglages.bouton + '</button>' : '') + '</div></div>' +
       (reglages.selection ? '<div class="scene-morceaux" role="group" aria-label="Morceau à coter"></div>' : '') +
-      '<div class="scene-vue" tabindex="0" aria-label="Modèle 3D, flèches pour faire tourner"><canvas></canvas><svg aria-hidden="true"></svg>' +
+      '<div class="scene-vue" tabindex="0" aria-label="Modèle 3D, flèches pour faire tourner"><canvas></canvas><svg aria-hidden="true"></svg>' + BOUTONS_FOND +
       (reglages.libre ? '<div class="zoom"><button type="button" data-plein aria-label="Plein écran">' + ICONE_PLEIN + '</button><button type="button" data-zoom="1.3" aria-label="Zoomer">+</button><button type="button" data-zoom="0.77" aria-label="Dézoomer">−</button></div>' : '') + '</div>' +
       (reglages.selection ? '<div class="fiche" aria-live="polite"></div>' : '') +
       '<figcaption></figcaption>';
@@ -992,7 +1016,7 @@
     var prise = null, doigts = {}, pince = null, appui = null;
     function deux() { var k = Object.keys(doigts); return k.length >= 2 ? [doigts[k[0]], doigts[k[1]]] : null; }
     zone.addEventListener('pointerdown', function (ev) {
-      if (!modele || ev.target.closest('.zoom')) return;
+      if (!modele || ev.target.closest('.zoom, .fond-3d')) return;
       doigts[ev.pointerId] = [ev.clientX, ev.clientY];
       appui = Object.keys(doigts).length === 1 && ev.button === 0 && !ev.shiftKey ? { id: ev.pointerId, x: ev.clientX, y: ev.clientY } : null;
       var a = angles(), d = reglages.libre && deux();
@@ -1031,7 +1055,7 @@
       }
     });
     ['pointerup', 'pointercancel'].forEach(function (n) { zone.addEventListener(n, function (ev) { delete doigts[ev.pointerId]; prise = null; pince = null; appui = null; }); });
-    if (!reglages.selection) zone.addEventListener('dblclick', function (ev) { if (!ev.target.closest('.zoom')) revenir(); });
+    if (!reglages.selection) zone.addEventListener('dblclick', function (ev) { if (!ev.target.closest('.zoom, .fond-3d')) revenir(); });
     if (reglages.libre) {
       var boutonPlein = zone.querySelector('[data-plein]');
       var basculerPlein = function (on) {
@@ -1063,6 +1087,12 @@
     toile.addEventListener('webglcontextlost', function (ev) { ev.preventDefault(); });
     toile.addEventListener('webglcontextrestored', function () { initGL(); construire(); });
     if (window.ResizeObserver) new ResizeObserver(demander).observe(zone);
+
+    vues.push(zone);
+    zone.querySelector('.fond-3d').addEventListener('click', function (ev) {
+      var b = ev.target.closest('button'); if (b) choisirFond(b.dataset.fond);
+    });
+    peindreFonds();
 
     initGL();
     return { el: el, definir: function (d) { donnees = d; construire(); }, choisir: function (i) { choix = i; } /* pris en compte au prochain definir */ };

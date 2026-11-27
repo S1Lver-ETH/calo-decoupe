@@ -66,6 +66,11 @@
       oublier: function () { acquis = ''; champ.value = ''; if (actif) { var m = micro; micro = null; if (m) m.abort(); try { seance(); } catch (err) { finir(''); } } }
     };
   }
+  /* mots mal entendus que le correcteur a remis d'aplomb */
+  function texteCorrige(l) {
+    if (!l || !l.length) return '';
+    return '<p class="corrige"><b>Mots corrigés</b>' + l.map(function (c) { return '<span><s>' + echapper(c[0]) + '</s> → ' + echapper({ metres: 'mètres', tole: 'tôle' }[c[1]] || c[1]) + '</span>'; }).join('') + '</p>';
+  }
   function peindreMicro(b, actif, repos, enCours) {
     b.classList.toggle('actif', actif);
     b.setAttribute('aria-pressed', String(actif));
@@ -125,7 +130,7 @@
     scene.el.classList.toggle('en-saisie', !!brouillon);
     scene.el.classList.toggle('sans-morceau', !vus.length);
     $('cmVide').textContent = brouillon ? 'Dictez le morceau : il apparaît ici.' : 'Aucun morceau pour l’instant.';
-    $('cmSelection').hidden = !!brouillon || choisi === null;
+    $('cmSelection').hidden = !!brouillon || !!dessin || choisi === null;
     if (!$('cmSelection').hidden) $('cmChoisi').textContent = 'Morceau ' + (choisi + 1);
   }
 
@@ -144,7 +149,7 @@
                 (al.length ? '<ul class="f2-alertes">' + al.map(function (a) { return '<li>' + echapper(a.texte) + '</li>'; }).join('') + '</ul>' : '');
             }).join('') + '</div>';
         }).join('') + '</div>';
-    }).join('') + '<p class="note">Cotes finies en ' + O.un() + ', sans les recouvrements. D = dos, V = ventre. Trait orange : fermeture.</p>';
+    }).join('') + '<p class="note">Cotes finies en ' + O.un() + ', sans les recouvrements. D = dos, V = ventre. Trait de couleur : fermeture.</p>';
   }
 
   function dessinerPlat(liste) {
@@ -175,33 +180,196 @@
   }
 
   /* ---------- saisie d'un morceau ---------- */
-  function ouvrirSaisie(i) {
+  /* dessine : relevé venu du pad de dessin, à vérifier en 3D sans lancer la dictée */
+  function ouvrirSaisie(i, dessine) {
     micTole.couper();
-    var base = i === null ? neuf() : K.normaliser(copie(morceaux[i]));
-    brouillon = { i: i, base: base, releve: copie(base), doutes: [], ia: '', occupe: false };
+    var base = dessine ? K.normaliser(dessine) : i === null ? neuf() : K.normaliser(copie(morceaux[i]));
+    brouillon = { i: i, base: base, releve: copie(base), doutes: [], ia: '', occupe: false, corrections: [] };
     choisi = null;
-    $('cmTitre').textContent = i === null ? 'Nouveau morceau ' + (morceaux.length + 1) : 'Modifier le morceau ' + (i + 1);
+    $('cmTitre').textContent = dessine ? 'Nouveau morceau ' + (morceaux.length + 1) + ' (dessiné)' : i === null ? 'Nouveau morceau ' + (morceaux.length + 1) : 'Modifier le morceau ' + (i + 1);
     $('cmTexte').value = '';
-    $('cmTexte').placeholder = i === null ? 'Tuyau en 60-40, un coude en tête, fermeture de dos avec deux sections' : 'Trois sections, fermeture en ventre';
-    $('cmInfo').textContent = '';
-    $('cmPanneau').hidden = false; $('cmAjouter').hidden = true;
+    $('cmTexte').placeholder = i === null && !dessine ? 'Tuyau en 60-40, un coude en tête, fermeture de dos avec deux sections' : 'Trois sections, fermeture en ventre';
+    $('cmInfo').textContent = dessine ? 'Vérifiez en 3D. Corrigez à la main ou à la voix, puis OK.' : '';
+    $('cmPlus').open = !!dessine;
+    $('cmPanneau').hidden = false; $('cmAjouter').hidden = true; $('cmMode').hidden = true;
     dessinerTole(); resumeSaisie();
-    micTole.demarrer();
+    if (!dessine) micTole.demarrer();
     scene.el.scrollIntoView({ block: 'start', behavior: 'auto' });
   }
   function fermerSaisie() {
     micTole.couper();
     brouillon = null;
-    $('cmPanneau').hidden = true; $('cmAjouter').hidden = false;
+    $('cmPanneau').hidden = true; $('cmAjouter').hidden = false; $('cmMode').hidden = false;
     dessinerTole();
+  }
+
+  /* ---------- ajout par dessin ---------- */
+  var CLE_MODE = 'calo-cote-mode', mode = 'dictee', dessin = null;
+  var ECHELLE = 5;                         /* mm par pixel pour les longueurs proposées */
+  function peindreMode() {
+    document.querySelectorAll('#cmMode button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.mode === mode)); });
+    $('cmIcone').innerHTML = mode === 'dessin' ? '<path d="M4 20l1.2-4.6L15.8 4.8a2 2 0 0 1 2.8 0l.6.6a2 2 0 0 1 0 2.8L8.6 18.8 4 20zM13.8 6.8l3.4 3.4"/>' : '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M8.5 21h7"/>';
+  }
+  function ouvrirDessin() {
+    var r = neuf();
+    dessin = { traits: [], courant: null, res: null, pieces: [], valeurs: [], coq: r.coq, e: r.e };
+    choisi = null;
+    $('cmDessin').hidden = false; $('cmAjouter').hidden = true; $('cmMode').hidden = true; $('cmSelection').hidden = true;
+    tailleToile(); peindreDessin(); dessinerCotes();
+    $('cmDessin').scrollIntoView({ block: 'start', behavior: 'auto' });
+  }
+  function fermerDessin() {
+    dessin = null;
+    $('cmDessin').hidden = true; $('cmAjouter').hidden = false; $('cmMode').hidden = false;
+    dessinerTole();
+  }
+  function tailleToile() {
+    var t = $('cdToile'), k = root.devicePixelRatio || 1;
+    t.width = Math.round(t.clientWidth * k); t.height = Math.round(t.clientHeight * k);
+  }
+  /* les traits, reliés dans l'ordre : un trait qui repart du bout prolonge, sinon on recommence */
+  function chemin() {
+    var c = [];
+    dessin.traits.forEach(function (t) {
+      if (!c.length) { c = t.slice(); return; }
+      var fin = c[c.length - 1], deb = c[0], d1 = Math.hypot(t[0][0] - fin[0], t[0][1] - fin[1]), d2 = Math.hypot(t[0][0] - deb[0], t[0][1] - deb[1]);
+      if (d1 <= 40) c = c.concat(t);
+      else if (d2 <= 40) c = t.slice().reverse().concat(c);
+      else c = t.slice();
+    });
+    return c;
+  }
+  function estimer(px) { return Math.max(100, Math.round(px * ECHELLE / 50) * 50); }
+  function reconnaitreDessin() {
+    var c = chemin(), res = c.length > 1 ? root.Croquis.reconnaitre(c.map(function (q) { return [q[0], -q[1]]; })) : null;
+    var anciens = dessin.pieces, vals = dessin.valeurs;
+    dessin.res = res;
+    dessin.pieces = res ? root.Croquis.pieces(res) : [];
+    /* les cotes déjà tapées restent sur la pièce du même rang et du même type */
+    dessin.valeurs = dessin.pieces.map(function (p, i) {
+      var v = anciens[i] && anciens[i].type === p.type && vals[i] && vals[i].tape ? vals[i] : null;
+      if (p.type === 'droit') return v || { longueur: estimer(res.batons[p.baton].L), tape: false };
+      return v || { angle: p.angle, sections: 1, fermeture: '', tape: false };
+    });
+  }
+  function peindreDessin() {
+    var t = $('cdToile'), g = t.getContext('2d'), k = root.devicePixelRatio || 1;
+    g.setTransform(k, 0, 0, k, 0, 0);
+    g.clearRect(0, 0, t.width, t.height);
+    var net = !!dessin.res && !dessin.courant;
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    g.lineWidth = net ? 3 : 4;
+    g.strokeStyle = net ? 'rgba(120, 132, 150, .45)' : getComputedStyle(t).getPropertyValue('--accent').trim() || '#e8890c';
+    dessin.traits.concat(dessin.courant ? [dessin.courant] : []).forEach(function (tr) {
+      g.beginPath(); tr.forEach(function (q, i) { if (i) g.lineTo(q[0], q[1]); else g.moveTo(q[0], q[1]); }); g.stroke();
+    });
+    $('cdVide').hidden = dessin.traits.length > 0 || !!dessin.courant;
+    peindrePropre();
+  }
+  /* le dessin remis au propre : bâtons, coudes arrondis et numéros des pièces */
+  function peindrePropre() {
+    var s = $('cdPropre'), res = dessin.res;
+    if (!res || dessin.courant) { s.innerHTML = ''; return; }
+    var tr = root.Croquis.trace(res, [s.clientWidth, s.clientHeight, 30]), h = '<path class="cd-tube" d="' + tr.d + '"/><path class="cd-axe" d="' + tr.d + '"/>';
+    tr.coins.forEach(function (c, i) { if (i === 0 || i === tr.coins.length - 1) h += '<circle class="cd-bout" cx="' + c[0].toFixed(1) + '" cy="' + c[1].toFixed(1) + '" r="5"/>'; });
+    dessin.pieces.forEach(function (p, n) {
+      var pos = tr.poses.filter(function (x) { return p.type === 'droit' ? x.baton === p.baton : x.coude === p.coude; })[0];
+      if (!pos) return;
+      var v = dessin.valeurs[n], txt = p.type === 'droit' ? (v.tape ? '' : '≈ ') + O.lg(v.longueur) : v.angle + '°';
+      var w = 22 + txt.length * 7.2, x = Math.max(4, Math.min(s.clientWidth - w - 4, pos.x - w / 2)), y = Math.max(4, Math.min(s.clientHeight - 26, pos.y - 13));
+      h += '<g class="cd-etiq' + (p.type === 'droit' && !v.tape ? ' estime' : '') + '" data-n="' + n + '" transform="translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ')"><rect width="' + w.toFixed(1) + '" height="26" rx="13"/><circle cx="13" cy="13" r="10"/><text class="cd-num" x="13" y="17.5">' + (n + 1) + '</text><text x="27" y="17.5">' + txt + '</text></g>';
+    });
+    s.innerHTML = h;
+  }
+  function dessinerCotes() {
+    var el = $('cdCotes');
+    if (!dessin.res) { el.innerHTML = ''; $('cdOk').disabled = true; return; }
+    $('cdOk').disabled = !dessin.pieces.length;
+    var opts = function (l, v, suffixe) { return l.map(function (x) { return '<option value="' + x + '"' + (+x === +v ? ' selected' : '') + '>' + x + (suffixe || '') + '</option>'; }).join(''); };
+    var coqs = K.COQ.indexOf(dessin.coq) >= 0 ? K.COQ : K.COQ.concat([dessin.coq]);
+    var h = '<p class="cd-compris"><b>Compris</b> ' + (dessin.pieces.length ? dessin.pieces.map(function (p) { return p.type === 'droit' ? 'droit' : 'coude ' + p.angle + '°'; }).join(' · ') : 'rien : dessinez plus grand') + '</p>' +
+      '<div class="fields cd-tuyau"><label class="field"><span>Coquille Ø intérieur</span><select data-cd="coq">' + opts(coqs, dessin.coq) + '</select></label>' +
+      '<label class="field"><span>Épaisseur isolant</span><select data-cd="e">' + opts([13, 19, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 120].concat([13, 19, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 120].indexOf(dessin.e) >= 0 ? [] : [dessin.e]), dessin.e) + '</select></label></div>';
+    h += '<ol class="cd-liste">' + dessin.pieces.map(function (p, n) {
+      var v = dessin.valeurs[n], f;
+      if (p.type === 'droit') f = '<label class="field"><span>Longueur (mm)' + (v.tape ? '' : ' · estimée') + '</span><input type="number" inputmode="numeric" min="1" data-cd="longueur" data-n="' + n + '" value="' + v.longueur + '"></label>';
+      else f = '<label class="field"><span>Angle (°)</span><input type="number" inputmode="numeric" min="5" max="180" data-cd="angle" data-n="' + n + '" value="' + v.angle + '"></label>' +
+        '<label class="field"><span>Sections entières</span><input type="number" inputmode="numeric" min="0" max="12" data-cd="sections" data-n="' + n + '" value="' + v.sections + '"></label>' +
+        '<label class="field"><span>Fermeture</span><select data-cd="fermeture" data-n="' + n + '">' + Object.keys(K.FERMETURES).filter(function (k) { return k !== 'angle'; }).map(function (k) { return '<option value="' + k + '"' + (k === v.fermeture ? ' selected' : '') + '>' + maj(K.FERMETURES[k]) + '</option>'; }).join('') + '</select></label>';
+      return '<li id="cdP' + n + '"><i>' + (n + 1) + '</i><div><b>' + (p.type === 'droit' ? 'Partie droite' : 'Coude ' + (p.sens ? K.SENS[p.sens] : '')) + '</b><div class="fields">' + f + '</div></div></li>';
+    }).join('') + '</ol><p class="note">Longueurs estimées d’après le dessin (≈) : tapez les vraies cotes.</p>';
+    el.innerHTML = h;
+  }
+  function versReleve() {
+    var r = neuf(), res = dessin.res;
+    K.poserCoquille(r, dessin.coq); r.e = dessin.e; r.finition = 'tole';
+    r.depart = root.Croquis.departDe(res);
+    r.pieces = dessin.pieces.map(function (p, n) {
+      var v = dessin.valeurs[n];
+      if (p.type === 'droit') return K.piece({ type: 'droit', longueur: v.longueur });
+      return K.piece({ type: 'coude', angle: v.angle, sens: p.sens, sections: v.sections, fermeture: v.fermeture });
+    });
+    return r;
+  }
+  function brancherPad() {
+    var t = $('cdToile');
+    var point = function (ev) { var b = t.getBoundingClientRect(); return [ev.clientX - b.left, ev.clientY - b.top]; };
+    t.addEventListener('pointerdown', function (ev) {
+      if (!dessin || (ev.pointerType === 'mouse' && ev.button !== 0)) return;
+      ev.preventDefault();
+      try { t.setPointerCapture(ev.pointerId); } catch (err) { /* sans capture */ }
+      dessin.courant = [point(ev)];
+      peindreDessin();
+    });
+    t.addEventListener('pointermove', function (ev) {
+      if (!dessin || !dessin.courant) return;
+      var l = ev.getCoalescedEvents ? ev.getCoalescedEvents() : [ev];
+      (l.length ? l : [ev]).forEach(function (e) { dessin.courant.push(point(e)); });
+      peindreDessin();
+    });
+    var finir = function () {
+      if (!dessin || !dessin.courant) return;
+      var c = dessin.courant;
+      dessin.courant = null;
+      if (c.length > 1) { dessin.traits.push(c); reconnaitreDessin(); dessinerCotes(); }
+      peindreDessin();
+    };
+    t.addEventListener('pointerup', finir);
+    t.addEventListener('pointercancel', finir);
+    $('cdPropre').addEventListener('click', function (ev) {
+      var g = ev.target.closest('.cd-etiq'); if (!g) return;
+      var champ = $('cdP' + g.dataset.n).querySelector('input');
+      champ.scrollIntoView({ block: 'center' }); champ.focus(); champ.select();
+    });
+    $('cdCotes').addEventListener('input', function (ev) {
+      var c = ev.target.dataset.cd; if (!c || !dessin) return;
+      var v = ev.target.value;
+      if (c === 'coq' || c === 'e') { dessin[c] = +v; return; }
+      var x = dessin.valeurs[+ev.target.dataset.n];
+      x[c] = c === 'fermeture' ? v : (+v || 0);
+      x.tape = true;
+      peindrePropre();
+    });
+    $('cdCotes').addEventListener('change', function (ev) {
+      if (ev.target.dataset.cd === 'longueur') dessinerCotes();
+    });
+    root.addEventListener('resize', function () { if (dessin) { tailleToile(); peindreDessin(); } });
+  }
+  function dessinVers3D() {
+    if (!dessin || !dessin.pieces.length) return;
+    var bad = dessin.valeurs.filter(function (v, n) { return dessin.pieces[n].type === 'droit' ? !(v.longueur > 0) : !(v.angle >= 5 && v.angle <= 180); });
+    if (bad.length) { O.avertir('Une cote est vide ou fausse : vérifiez les longueurs et les angles.'); return; }
+    var r = versReleve();
+    dessin = null; $('cmDessin').hidden = true;
+    ouvrirSaisie(null, r);
   }
   function lireTexte() {
     if (!brouillon) return;
     var t = $('cmTexte').value.trim();
-    if (!t) { brouillon.releve = copie(brouillon.base); brouillon.doutes = []; }
+    if (!t) { brouillon.releve = copie(brouillon.base); brouillon.doutes = []; brouillon.corrections = []; }
     else {
       var res = K.interpreter(t, brouillon.base, O.un(), { corrige: brouillon.i !== null });
-      brouillon.releve = res.releve; brouillon.releve.finition = 'tole'; brouillon.doutes = res.doutes;
+      brouillon.releve = res.releve; brouillon.releve.finition = 'tole'; brouillon.doutes = res.doutes; brouillon.corrections = res.corrections;
     }
     dessinerTole(); resumeSaisie();
   }
@@ -213,6 +381,7 @@
         return '<li>' + K.TYPES[g.type] + ' ' + echapper([K.resumePiece(g, val), K.texteFermeture(g)].filter(Boolean).join(' · ')) + '</li>';
       }).join('') + '</ul>';
     }
+    h += texteCorrige(brouillon.corrections);
     if (brouillon.occupe) h += '<p class="note attente">L’agent IA réfléchit…</p>';
     if (brouillon.doutes.length) h += '<div class="warn"><b>À vérifier</b><ul>' + brouillon.doutes.map(function (x) { return '<li>' + echapper(x) + '</li>'; }).join('') + '</ul></div>';
     $('cmCompris').innerHTML = h;
@@ -290,39 +459,72 @@
   function nomDiam(x) { return x.coq ? x.coq + (x.e ? '-' + x.e : '') : 'Ø ?'; }
   function detailDiam(x) { return (x.coq ? 'coquille ' + x.coq : 'diamètre non dit') + (x.e ? ' · épaisseur ' + x.e : ' · épaisseur non dite'); }
   function anglesTexte(a) { var l = Object.keys(a || {}); return l.length ? l.map(function (k) { return a[k] + ' à ' + k + '°'; }).join(', ') : ''; }
+  /* fiches au format d'une page imprimée : papier blanc, tableau, lisible d'un coup d'œil */
+  function aujourdhui() { var d = new Date(); return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear(); }
+  function entete(titre, sous, droite) {
+    return '<header class="f-tete"><div class="f-titre"><b>' + titre + '</b><span>' + sous + '</span></div><div class="f-date"><b>' + aujourdhui() + '</b><span>' + droite + '</span></div></header>';
+  }
+  function pluriel(n, mot) { return n + ' ' + mot + (n > 1 ? 's' : ''); }
+  function ficheListe() {
+    var lignes = entrees.map(function (x, i) {
+      var quoi = NOMS.filter(function (k) { return x.q[k[0]]; }).map(function (k) {
+        return '<li class="m-' + (k[2] === 'PVC' ? 'pvc' : 'laine') + '"><b>' + (k[1] === 'm' ? nombre(x.q[k[0]]) + ' m' : nombre(x.q[k[0]])) + '</b> ' + (k[1] === 'm' ? 'de ' + k[2] : k[1] + (x.q[k[0]] > 1 ? 's' : '') + ' ' + k[2]) + '</li>';
+      }).join('');
+      var a = anglesTexte(x.angles);
+      return '<tr><td class="f-n">' + (i + 1) + '</td><td class="f-d"><b>' + nomDiam(x) + '</b>' + (x.coq && x.e ? '' : '<small>' + detailDiam(x) + '</small>') + '</td>' +
+        '<td><ul class="f-quoi">' + (quoi || '<li class="f-rien">rien de compté</li>') + '</ul>' + (a ? '<small class="f-angles">coudes ' + a + '</small>' : '') + '</td>' +
+        '<td class="f-x"><button type="button" data-act="retirer" data-n="' + i + '" aria-label="Retirer la ligne ' + (i + 1) + '">✕</button></td></tr>';
+    }).join('');
+    return '<article class="feuille">' + entete('Prise de cotes', 'PVC et laine · ce qui a été dit', pluriel(entrees.length, 'ligne')) +
+      '<table class="f-table f-liste"><thead><tr><th>N°</th><th>Tuyau</th><th>À prendre</th><th><span class="lecteur">Retirer</span></th></tr></thead><tbody>' + lignes + '</tbody></table>' +
+      '<p class="f-pied"><span class="m-pvc">PVC</span><span class="m-laine">Laine</span>« 60-40 » = coquille Ø 60, épaisseur 40</p></article>';
+  }
+  function ficheRecap() {
+    var groupes = K.recapitulatif(entrees), total = {};
+    groupes.forEach(function (g) { QUOI_.forEach(function (k) { if (g.q[k]) total[k] = Math.round(((total[k] || 0) + g.q[k]) * 1000) / 1000; }); });
+    var cell = function (v, m) { return v ? '<b>' + nombre(v) + '</b>' + (m ? '<small> m</small>' : '') : '<span class="f-vide">–</span>'; };
+    var ligne = function (nom, q, cl) {
+      return '<tr' + (cl ? ' class="' + cl + '"' : '') + '><th scope="row">' + nom + '</th><td class="m-pvc">' + cell(q.pvc, true) + '</td><td class="m-laine">' + cell(q.laine, true) + '</td><td class="m-pvc">' + cell(q.coudePVC) + '</td><td class="m-laine">' + cell(q.coudeLaine) + '</td></tr>';
+    };
+    var notes = [];
+    groupes.forEach(function (g) {
+      var a = anglesTexte(g.angles), c = [];
+      if (g.q.coquillesPVC) c.push(pluriel(nombre(g.q.coquillesPVC), 'coquille') + ' PVC');
+      if (g.q.coquilles) c.push(pluriel(nombre(g.q.coquilles), 'coquille') + ' laine');
+      if (a) c.push('coudes ' + a);
+      if (c.length) notes.push('<li><b>' + nomDiam(g) + '</b> : ' + c.join(' · ') + '</li>');
+    });
+    return '<article class="feuille">' + entete('Récapitulatif', 'Rangé par diamètre et épaisseur', pluriel(groupes.length, 'diamètre')) +
+      '<table class="f-table f-recap"><thead><tr><th>Tuyau</th><th class="m-pvc">PVC</th><th class="m-laine">Laine</th><th class="m-pvc">Coudes PVC</th><th class="m-laine">Coudes laine</th></tr></thead><tbody>' +
+      groupes.map(function (g) { return ligne(nomDiam(g), g.q); }).join('') + '</tbody>' +
+      (groupes.length > 1 ? '<tfoot>' + ligne('Total', total, 'f-total') + '</tfoot>' : '') + '</table>' +
+      (notes.length ? '<ul class="f-notes">' + notes.join('') + '</ul>' : '') + '</article>';
+  }
+  var QUOI_ = ['pvc', 'laine', 'coudePVC', 'coudeLaine', 'coquillesPVC', 'coquilles'];
   function dessinerPvc() {
     if (!entrees.length) {
       $('pvcListe').innerHTML = '<p class="note vide">Rien pour l’instant. Dites par exemple : « en 60-40, 4 coudes et 12 mètres ».</p>';
       $('pvcRecap').innerHTML = '<p class="note vide">Le récapitulatif se remplit tout seul.</p>';
       return;
     }
-    $('pvcListe').innerHTML = '<ol class="metre">' + entrees.map(function (x, i) {
-      var puces = NOMS.filter(function (k) { return x.q[k[0]]; }).map(function (k) { return '<span class="q q-' + (k[2] === 'PVC' ? 'pvc' : 'laine') + '">' + quantite(k, x.q[k[0]]) + '</span>'; }).join('');
-      var a = anglesTexte(x.angles);
-      return '<li><i>' + (i + 1) + '</i><div><p><b>' + nomDiam(x) + '</b> <small>' + detailDiam(x) + '</small></p><div class="puces">' + puces + '</div>' + (a ? '<small>Coudes : ' + a + '</small>' : '') + '</div><button type="button" data-act="retirer" data-n="' + i + '" aria-label="Retirer la ligne ' + (i + 1) + '">✕</button></li>';
-    }).join('') + '</ol><div class="actions"><button type="button" class="btn" data-act="toutvider">Vider la liste</button></div>';
-
-    var total = {};
-    var cases = function (q, tout) {
-      return NOMS.filter(function (k, i) { return i < 4 || q[k[0]]; }).map(function (k) {
-        var n = q[k[0]] || 0;
-        var titre = k[1] === 'm' ? k[2].charAt(0).toUpperCase() + k[2].slice(1) : (k[1] === 'coude' ? 'Coudes ' : 'Coquilles ') + k[2];
-        return '<div class="q-' + (k[2] === 'PVC' ? 'pvc' : 'laine') + (n ? '' : ' nul') + '"><span>' + titre + '</span><b>' + (n ? nombre(n) : '–') + '</b>' + (n && k[1] === 'm' ? '<small>m</small>' : '') + '</div>';
-      }).join('');
-    };
-    var groupes = K.recapitulatif(entrees);
-    groupes.forEach(function (g) { NOMS.forEach(function (k) { if (g.q[k[0]]) total[k[0]] = (total[k[0]] || 0) + g.q[k[0]]; }); });
-    $('pvcRecap').innerHTML = groupes.map(function (g) {
-      var a = anglesTexte(g.angles);
-      return '<div class="recap-diam"><h3><b>' + nomDiam(g) + '</b><span>' + detailDiam(g) + '</span></h3><div class="recap-cases">' + cases(g.q) + '</div>' + (a ? '<p class="note">Coudes : ' + a + '</p>' : '') + '</div>';
-    }).join('') + (groupes.length > 1 ? '<div class="recap-diam total"><h3><b>Total</b><span>tous diamètres</span></h3><div class="recap-cases">' + cases(total) + '</div></div>' : '');
+    $('pvcListe').innerHTML = ficheListe() + '<div class="actions deux"><button type="button" class="btn primary" data-act="pdf">Faire un PDF</button><button type="button" class="btn" data-act="toutvider">Vider la liste</button></div>';
+    $('pvcRecap').innerHTML = ficheRecap() + '<div class="actions"><button type="button" class="btn primary" data-act="pdf">Faire un PDF</button></div>';
+  }
+  /* impression : les deux fiches, sans les boutons ; « Enregistrer en PDF » dans la fenêtre d'impression du téléphone */
+  function imprimerPvc() {
+    var p = $('print');
+    p.innerHTML = '<div class="feuilles">' + ficheListe() + ficheRecap() + '</div>';
+    p.querySelectorAll('.f-x').forEach(function (c) { c.remove(); });
+    p.querySelectorAll('.f-liste th:last-child').forEach(function (c) { c.remove(); });
+    document.body.classList.add('gabarit');
+    window.print();
   }
   function lirePvc() {
     var t = $('pvcTexte').value.trim();
     if (depart === null) depart = copie(entrees);
     var res = t ? K.metre(t, depart) : { entrees: copie(depart), doutes: [] };
     entrees = res.entrees; ecrire(CLE_PVC, entrees);
-    $('pvcDoutes').innerHTML = res.doutes.length ? '<div class="warn"><ul>' + res.doutes.map(function (x) { return '<li>' + echapper(x) + '</li>'; }).join('') + '</ul></div>' : '';
+    $('pvcDoutes').innerHTML = texteCorrige(res.corrections) + (res.doutes.length ? '<div class="warn"><ul>' + res.doutes.map(function (x) { return '<li>' + echapper(x) + '</li>'; }).join('') + '</ul></div>' : '');
     dessinerPvc();
   }
   /* la liste telle qu'elle est devient le point de départ de la suite de la dictée */
@@ -360,7 +562,7 @@
     scene = root.Scene3D.creer('ensemble', 'Mes morceaux en 3D', true, {
       libre: true, selection: true, bouton: 'Recentrer', depart: null, mot: 'Morceau', court: true,
       invite: 'Touchez un morceau, ou son numéro, pour le voir seul avec ses cotes.',
-      surChoix: function (i) { if (brouillon) return; choisi = i; if (i !== null) plat = i; dessinerTole(); }
+      surChoix: function (i) { if (brouillon || dessin) return; choisi = i; if (i !== null) plat = i; dessinerTole(); }
     });
     $('cote-scene').appendChild(scene.el);
     scene.el.querySelector('.scene-vue').insertAdjacentHTML('beforeend', '<p class="vide-3d" id="cmVide"></p>');
@@ -378,12 +580,16 @@
       else if (!$('pvcSaisie').hidden) peindreMicro($('pvcMicro'), false, 'Terminer la prise de cotes', '');
     });
     $('cmTexte').addEventListener('input', lireTexte);
+    mode = lire(CLE_MODE) === 'dessin' ? 'dessin' : 'dictee';
+    peindreMode(); brancherPad();
+    $('cmMode').addEventListener('click', function (ev) { var b = ev.target.closest('button'); if (!b) return; mode = b.dataset.mode; ecrire(CLE_MODE, mode); peindreMode(); });
     $('pvcTexte').addEventListener('input', lirePvc);
 
     $('coteFinition').addEventListener('click', function (ev) {
       var b = ev.target.closest('button'); if (!b) return;
       couperMicros();
       if (brouillon) fermerSaisie();
+      if (dessin) fermerDessin();
       if (!$('pvcSaisie').hidden) terminerPvc();
       vue = b.dataset.finition; ecrire(CLE_VUE, vue); montrer();
       if (vue === 'tole') dessinerTole();
@@ -391,7 +597,11 @@
     $('p-cote').addEventListener('click', function (ev) {
       var b = ev.target.closest('[data-act]'); if (!b) return;
       var act = b.dataset.act, i = +b.dataset.i;
-      if (act === 'ajouter') ouvrirSaisie(null);
+      if (act === 'ajouter') { if (mode === 'dessin') ouvrirDessin(); else ouvrirSaisie(null); }
+      else if (act === 'dessin-retour') { if (dessin) { dessin.traits.pop(); reconnaitreDessin(); dessinerCotes(); peindreDessin(); } }
+      else if (act === 'dessin-effacer') { if (dessin && dessin.traits.length && window.confirm('Effacer tout le dessin ?')) { dessin.traits = []; reconnaitreDessin(); dessinerCotes(); peindreDessin(); } }
+      else if (act === 'dessin-3d') dessinVers3D();
+      else if (act === 'dessin-fermer') fermerDessin();
       else if (act === 'micro') { if (micTole.actif()) micTole.arreter(); else micTole.demarrer(); }
       else if (act === 'ok') valider();
       else if (act === 'abandon') fermerSaisie();
@@ -400,13 +610,14 @@
         if (choisi === null || !window.confirm('Supprimer définitivement le morceau ' + (choisi + 1) + ' ?')) return;
         morceaux.splice(choisi, 1); choisi = null; plat = null; sauverTole(); dessinerTole();
       } else if (act === 'voir') {
-        if (brouillon) return;
+        if (brouillon || dessin) return;
         choisi = i; plat = i; dessinerTole(); scene.el.scrollIntoView({ block: 'start' });
       } else if (act === 'plat') { if (brouillon) return; plat = i; if (choisi !== null) choisi = i; dessinerTole(); }
       else if (act === 'gabarit') O.gabarit('cote', formes[+b.dataset.n]);
       else if (act === 'oter') { var r = copie(brouillon.releve); r.pieces.splice(+b.dataset.p, 1); figerSaisie(r); }
       else if (act === 'pvc') basculerPvc();
       else if (act === 'retirer') { entrees.splice(+b.dataset.n, 1); figerPvc(); }
+      else if (act === 'pdf') imprimerPvc();
       else if (act === 'toutvider') { if (window.confirm('Vider toute la liste de la prise de cotes ?')) { entrees = []; figerPvc(); } }
     });
     $('cmMain').addEventListener('change', function (ev) {
@@ -447,7 +658,7 @@
     dessinerPvc();
     if (root.Widgets) root.Widgets.organiser($('out-cote-pvc'), 'cotepvc');
   }
-  function quitter() { if (!pret) return; couperMicros(); if (brouillon) fermerSaisie(); if (!$('pvcSaisie').hidden) terminerPvc(); }
+  function quitter() { if (!pret) return; couperMicros(); if (brouillon) fermerSaisie(); if (dessin) fermerDessin(); if (!$('pvcSaisie').hidden) terminerPvc(); }
 
   root.Cote = { rendre: rendre, quitter: quitter };
 })(this);

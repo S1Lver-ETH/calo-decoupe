@@ -521,7 +521,7 @@
     var tuile = function (titre, v, aide) { return '<div><span>' + titre + '</span><b>' + lg(v) + ' <small>' + un() + '</small></b><em>' + aide + '</em></div>'; };
     var points = C.reperesPiquage(p, S.fermeture);
     return dessinPVC(f, 'Gabarit PVC du piquage avec ses cotes') +
-      '<figcaption>Cotes en ' + un() + '. Trait mixte : trait d’équerre, d’où partent les descentes. Bord du dessin : coupe du PVC, ajustée sur le principal.' + (S.recouv > 0 ? ' Bande hachurée : recouvrement de fermeture.' : '') + ' Trait orange : ouverture de compas. Le haut du gabarit est une réserve de longueur à adapter.</figcaption>' +
+      '<figcaption>Cotes en ' + un() + '. Trait mixte : trait d’équerre, d’où partent les descentes. Bord du dessin : coupe du PVC, ajustée sur le principal.' + (S.recouv > 0 ? ' Bande hachurée : recouvrement de fermeture.' : '') + ' Trait de couleur : ouverture de compas. Le haut du gabarit est une réserve de longueur à adapter.</figcaption>' +
       '<div class="compas-bloc"><div class="piece"><h3>Au compas</h3><div class="bascule onglets" role="group" aria-label="Unité des cotes">' +
       ['mm', 'cm'].map(function (u) { return '<button type="button" data-unite="' + u + '" aria-pressed="' + (u === un()) + '">' + (u === 'mm' ? 'Millimètres' : 'Centimètres') + '</button>'; }).join('') +
       '</div></div><p class="note">Du point à 0 au fond de la gueule de loup (à ' + z.angle + '° l’un de l’autre) :</p><div class="cotes">' +
@@ -597,7 +597,7 @@
     var tuile = function (titre, v, aide) { return '<div><span>' + titre + '</span><b>' + lg(v) + ' <small>' + un() + '</small></b><em>' + aide + '</em></div>'; };
     var oblique = p.gamma < 90;
     return dessinPVC(f, 'Gabarit PVC du principal avec ses cotes') +
-      '<figcaption>Cotes en ' + un() + '. Traits mixtes : axe du trou et croisement des axes. Trou à découper : en couleur laine.' + (S.recouv > 0 ? ' Bande hachurée : recouvrement de fermeture.' : '') + ' Trait orange : ouverture de compas. Haut du gabarit : côté 0° du piquage.</figcaption>' +
+      '<figcaption>Cotes en ' + un() + '. Traits mixtes : axe du trou et croisement des axes. Trou à découper : en couleur laine.' + (S.recouv > 0 ? ' Bande hachurée : recouvrement de fermeture.' : '') + ' Trait de couleur : ouverture de compas. Haut du gabarit : côté 0° du piquage.</figcaption>' +
       '<div class="compas-bloc"><div class="piece"><h3>Au compas</h3><div class="bascule onglets" role="group" aria-label="Unité des cotes">' +
       ['mm', 'cm'].map(function (u) { return '<button type="button" data-unite="' + u + '" aria-pressed="' + (u === un()) + '">' + (u === 'mm' ? 'Millimètres' : 'Centimètres') + '</button>'; }).join('') +
       '</div></div><div class="cotes">' +
